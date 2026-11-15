@@ -137,7 +137,7 @@ export function render(main) {
     try { landmarker = await FaceLandmarker.createFromOptions(files, opts('GPU')); }
     catch { landmarker = await FaceLandmarker.createFromOptions(files, opts('CPU')); }
 
-    viewer = new BrainViewer($('#brain3d'), { controls: false, mirrored: true, label: '3D brain placed over your head' });
+    viewer = new BrainViewer($('#brain3d'), { controls: false, mirrored: true, post: false, background: false, label: '3D brain placed over your head' });
     viewer.camera = new THREE.PerspectiveCamera(63, video.videoWidth / video.videoHeight, 1, 10000); // MediaPipe's virtual camera (cm)
     viewer.resize();
     viewer.root.matrixAutoUpdate = false;

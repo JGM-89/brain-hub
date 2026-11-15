@@ -25,6 +25,8 @@ export function render(main, [initial]) {
         <button type="button" data-hemi="right" aria-pressed="false" title="Hide the right hemisphere">Hide right</button>
       </div>
       <div id="labels"></div>
+      <button type="button" class="panel-toggle left" data-toggle-panel="parts" aria-expanded="true">☰ Parts</button>
+      <button type="button" class="panel-toggle right" data-toggle-panel="info" aria-expanded="true">ⓘ Info</button>
       <div class="stage-slider slider">
         <label for="explode">Pull apart: <span id="explode-val">0%</span></label>
         <input id="explode" type="range" min="0" max="1" step="0.01" value="0" />
@@ -130,6 +132,12 @@ export function render(main, [initial]) {
     }
   });
 
+  main.querySelectorAll('[data-toggle-panel]').forEach((btn) => btn.addEventListener('click', () => {
+    const panel = btn.dataset.togglePanel === 'parts' ? main.querySelector('.explorer > aside') : info;
+    const open = panel.classList.toggle('collapsed') === false;
+    btn.setAttribute('aria-expanded', String(open));
+  }));
+  // move the toggle buttons out of the toolbar's way: they sit above the panels
   const ex = main.querySelector('#explode');
   ex.addEventListener('input', () => { viewer.setExplode(Number(ex.value)); main.querySelector('#explode-val').textContent = `${Math.round(ex.value * 100)}%`; });
 

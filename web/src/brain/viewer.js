@@ -6,11 +6,12 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { STRUCTURES, byId, REGION_IDS } from '../data/structures.js';
 import { reducedMotion } from '../settings.js';
 import landmarks from '../data/landmarks.json';
+import { createLook, studioLights, tissueMaterial } from '../three/look.js';
 
 const NODE_TO_STRUCTURE = {};
 for (const s of STRUCTURES) for (const n of s.nodes || []) NODE_TO_STRUCTURE[n] = s.id;
 const LOBE_IDS = ['frontal', 'parietal', 'temporal', 'occipital', 'insula', 'cingulate'];
-const REAL_TISSUE = new THREE.Color('#E9C9C0');
+const REAL_TISSUE = new THREE.Color('#D4A496');
 const REGION_COLORS = REGION_IDS.map((id) => new THREE.Color(byId[id]?.color || '#ffffff'));
 
 let gltfPromise = null;
@@ -24,7 +25,7 @@ function loadModel() {
 }
 
 function cortexMaterial(baseColor, shared) {
-  const mat = new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.62, metalness: 0.0, side: THREE.DoubleSide, transparent: true });
+  const mat = tissueMaterial(baseColor, { side: THREE.DoubleSide, transparent: true, roughness: 0.55 });
   mat.userData.uniforms = shared;
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, shared);
@@ -46,7 +47,7 @@ function cortexMaterial(baseColor, shared) {
         varying float vShade; varying vec3 vRegionColor; varying float vRegionOn; varying float vHL;`)
       .replace('vec4 diffuseColor = vec4( diffuse, opacity );', `
         vec3 base = mix(diffuse, uReal, uRealMix);
-        float shade = 0.52 + 0.48 * vShade;            // sulci darker, gyri lighter
+        float shade = 0.34 + 0.66 * vShade;            // sulci darker, gyri lighter
         vec3 col = base * shade;
         float showR = uShowRegions * vRegionOn;
         col = mix(col, mix(col * 0.6, vRegionColor * (0.75 + 0.35 * vShade), 0.92), showR);
@@ -56,7 +57,7 @@ function cortexMaterial(baseColor, shared) {
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         totalEmissiveRadiance += vRegionColor * 0.35 * vHL * uPulse;`);
   };
-  mat.customProgramCacheKey = () => 'cortex-v1';
+  mat.customProgramCacheKey = () => 'cortex-v2';
   return mat;
 }
 
@@ -83,12 +84,10 @@ export class BrainViewer {
     this.camera = new THREE.PerspectiveCamera(32, 1, 1, 5000);
     this.camera.position.set(330, 120, 330);
 
-    const hemi = new THREE.HemisphereLight('#ffffff', '#3a3550', 1.4);
-    const key = new THREE.DirectionalLight('#ffffff', 2.2); key.position.set(200, 300, 250);
-    const rim = new THREE.DirectionalLight('#9db7ff', 1.3); rim.position.set(250, 80, -300);
-    const fill = new THREE.DirectionalLight('#ffd9c7', 0.6); fill.position.set(200, -150, 200);
-    this.scene.add(hemi, key, rim, fill);
-    this.lights = { hemi, key, rim, fill };
+    this.lights = studioLights(1.5);
+    this.camera.add(this.lights);            // lights travel with the camera, so the brain is always well lit
+    this.scene.add(this.camera);
+    this.look = createLook(this.renderer, this.scene, this.camera, { post: this.opts.post !== false, background: this.opts.background !== false });
 
     this.root = new THREE.Group();        // whole brain (translated so its centre is at the origin)
     this.scene.add(this.root);
@@ -159,7 +158,7 @@ export class BrainViewer {
       } else {
         const sid = NODE_TO_STRUCTURE[name];
         const s = byId[sid];
-        o.material = new THREE.MeshStandardMaterial({ color: s?.color || '#cccccc', roughness: 0.45, metalness: 0.0, transparent: true });
+        o.material = tissueMaterial(new THREE.Color(s?.color || '#cccccc'), { transparent: true, roughness: 0.42 });
         o.userData.structure = sid;
         o.userData.hemi = name.endsWith('_left') ? 'left' : name.endsWith('_right') ? 'right' : 'mid';
       }
@@ -231,6 +230,7 @@ export class BrainViewer {
   resize() {
     const w = this.container.clientWidth || 1, h = this.container.clientHeight || 1;
     this.renderer.setSize(w, h, false);
+    this.look?.setSize(w, h);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -246,6 +246,7 @@ export class BrainViewer {
     this.uniforms.uHighlight.value = sel?.region || 0;
     this.uniforms.uDimOthers.value = sel?.region ? 1 : 0;
     this.uniforms.uRealMix.value = this.real || this.mode === 'functions' ? 1 : 0;
+    let anySeeThrough = false;
     for (const o of Object.values(this.meshes)) {
       const sid = o.userData.structure;
       const isCortex = o.name.startsWith('cortex_');
@@ -268,14 +269,16 @@ export class BrainViewer {
       o.material.opacity = opacity;
       o.material.depthWrite = opacity > 0.99;
       o.renderOrder = opacity > 0.99 ? 0 : 1;
+      if (opacity < 0.99 && visible) anySeeThrough = true;
       if (!isCortex) {
         const c = o.userData.baseColor.clone();
         if (this.real) c.lerp(new THREE.Color('#D8B4A8'), 0.35);
         o.material.color.copy(c);
         o.material.emissive?.set(isSel ? o.userData.baseColor : '#000000');
-        o.material.emissiveIntensity = isSel ? 0.35 : 0;
+        o.material.emissiveIntensity = isSel ? 0.5 : 0;
       }
     }
+    this.look?.setAO(!anySeeThrough);
   }
 
   setXray(on) { this.xray = on; this.applyMode(); }
@@ -464,7 +467,8 @@ export class BrainViewer {
     }
     this.controls?.update();
     this.emit('frame', dt);
-    this.renderer.render(this.scene, this.camera);
+    this.look.setCamera(this.camera);
+    this.look.render();
   }
 
   animateExplode(t) { if (reducedMotion()) this.setExplode(t); else this._explodeTarget = t; }
