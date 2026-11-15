@@ -109,6 +109,61 @@ ho_cort = datasets.fetch_atlas_harvard_oxford("cort-maxprob-thr25-1mm")
 ho_cort_img = to305(ho_cort.maps if not isinstance(ho_cort.maps, str) else nib.load(ho_cort.maps))
 HOC = {n: i for i, n in enumerate(ho_cort.labels)}
 
+def smooth_split(verts, faces, lab, region, shade, iters=8):
+    """Split a surface into labelled pieces along SMOOTH boundaries.
+    Each label gets an indicator field that is Laplacian-smoothed over the mesh; triangles that
+    straddle two labels are cut where the two fields are equal (linear interpolation along edges),
+    so lobe edges follow smooth curves instead of a triangle sawtooth."""
+    n, K = len(verts), len(LOBES)
+    nb = [[] for _ in range(n)]
+    for a, b, c in faces:
+        nb[a] += [b, c]; nb[b] += [a, c]; nb[c] += [a, b]
+    rows = np.repeat(np.arange(n), [len(x) for x in nb]); cols = np.concatenate([np.array(x) for x in nb])
+    from scipy.sparse import csr_matrix
+    W = csr_matrix((np.ones(len(rows)), (rows, cols)), shape=(n, n))
+    W = csr_matrix(W.multiply(1.0 / np.asarray(W.sum(1)).ravel()[:, None]))
+    F = np.zeros((n, K)); F[np.arange(n), lab] = 1.0
+    for _ in range(iters):
+        F = 0.5 * F + 0.5 * (W @ F)
+    vl = F.argmax(1)
+    V = [verts]; R = [region]; S = [shade]; nxt = [n]
+    pieces = {k: [] for k in range(K)}
+    cache = {}
+    def cut(i, j, A, B):
+        key = (min(i, j), max(i, j), min(A, B), max(A, B))
+        if key in cache: return cache[key]
+        gi, gj = F[i, A] - F[i, B], F[j, A] - F[j, B]
+        t = gi / (gi - gj) if gi != gj else 0.5
+        t = float(np.clip(t, 0.02, 0.98))
+        V.append((verts[i] + t * (verts[j] - verts[i]))[None])
+        R.append(np.array([region[i] if t < 0.5 else region[j]]))
+        S.append(np.array([shade[i] + t * (shade[j] - shade[i])]))
+        idx = nxt[0]; nxt[0] += 1; cache[key] = idx
+        return idx
+    for f in faces:
+        ls = vl[f]
+        if ls[0] == ls[1] == ls[2]:
+            pieces[ls[0]].append(f); continue
+        u = np.unique(ls)
+        if len(u) == 3:   # rare triple junction: keep whole triangle in the majority-by-field lobe
+            pieces[np.argmax(F[f].sum(0))].append(f); continue
+        A, B = u
+        # rotate so the odd one out is first
+        odd = [k for k in range(3) if (ls == ls[k]).sum() == 1][0]
+        a, b, c = f[odd], f[(odd + 1) % 3], f[(odd + 2) % 3]
+        La, Lb = vl[a], vl[b]
+        p = cut(a, b, La, Lb); q = cut(a, c, La, Lb)
+        pieces[La].append([a, p, q])
+        pieces[Lb].append([p, b, c]); pieces[Lb].append([p, c, q])
+    allv = np.concatenate(V); allr = np.concatenate(R); alls = np.concatenate(S)
+    out = {}
+    for k, fl in pieces.items():
+        if not fl: continue
+        fl = np.array(fl)
+        used, inv = np.unique(fl.ravel(), return_inverse=True)
+        out[LOBES[k]] = dict(v=allv[used], f=inv.reshape(-1, 3), region=allr[used], shade=alls[used])
+    return out
+
 def build_hemi(hemi):
     pial = surface.load_surf_mesh(fs6[f"pial_{hemi}"])
     sph6 = surface.load_surf_mesh(fs6[f"sphere_{hemi}"]).coordinates
@@ -158,14 +213,7 @@ def build_hemi(hemi):
     s = np.clip((sulc - np.percentile(sulc, 2)) / (np.percentile(sulc, 98) - np.percentile(sulc, 2)), 0, 1)
     shade = (1.0 - s)
 
-    out = {}
-    face_lobe = lobe[faces[:, 0]]
-    for L in LOBES:
-        fsel = faces[face_lobe == L]
-        if len(fsel) == 0:
-            continue
-        used, inv = np.unique(fsel.ravel(), return_inverse=True)
-        out[L] = dict(v=verts[used], f=inv.reshape(-1, 3), region=region[used], shade=shade[used])
+    out = smooth_split(verts, faces, np.array([LOBES.index(l) for l in lobe]), region, shade)
     counts = {REGIONS[i]: int((region == i).sum()) for i in range(1, len(REGIONS))}
     log(hemi, "region vertex counts", counts)
     return out

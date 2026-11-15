@@ -58,7 +58,8 @@ export function render(main) {
       </fieldset>
       <fieldset style="border:0;padding:0;margin:0"><legend class="group-label">My face</legend>
         <div class="controls-row" id="face-btns">
-          <button type="button" data-face="xray" aria-pressed="true">X-ray look</button>
+          <button type="button" data-face="colour" aria-pressed="true">Normal</button>
+          <button type="button" data-face="xray" aria-pressed="false">X-ray look</button>
           <button type="button" data-face="blur" aria-pressed="false">Blurred</button>
           <button type="button" data-face="hide" aria-pressed="false">Hidden</button>
         </div>
@@ -141,6 +142,11 @@ export function render(main) {
     viewer.resize();
     viewer.root.matrixAutoUpdate = false;
     await viewer.ready;
+    // the viewer frames the brain from ~5 m away when it loads; put the camera back where
+    // MediaPipe's camera is (at the origin, looking down -Z) and stop it ever moving again
+    viewer._tween = null;
+    viewer.camera.position.set(0, 0, 0); viewer.camera.quaternion.identity(); viewer.camera.updateMatrixWorld();
+    viewer.frame = () => {}; viewer.focusOn = () => {};
     pathway = buildVisualPathway(viewer);
     pathway.setVisible(false);
     viewer.on('select', renderInfo);
@@ -269,7 +275,7 @@ export function render(main) {
 
   // labels for the selected part
   const labelLoop = () => {
-    if (!main.isConnected) return;
+    if (!main.isConnected || !$('#xlabels')) return;
     const id = viewer?.selected;
     const p = id && viewer.root.visible ? viewer.screenPos(id) : null;
     $('#xlabels').innerHTML = p ? `<div class="label3d" style="left:${p.x}px;top:${p.y}px"><span>${byId[id].name}</span></div>` : '';
@@ -285,11 +291,11 @@ export function render(main) {
     const b = e.target.closest('[data-face]'); if (!b) return;
     main.querySelectorAll('[data-face]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     const f = b.dataset.face;
-    video.style.filter = f === 'xray' ? 'grayscale(1) contrast(1.15) brightness(0.75)' : f === 'blur' ? 'grayscale(0.6) blur(14px) brightness(0.7)' : '';
+    video.style.filter = f === 'xray' ? 'grayscale(1) contrast(1.15) brightness(0.75)' : f === 'blur' ? 'blur(14px) brightness(0.8)' : '';
     video.style.opacity = f === 'hide' ? '0' : '1';
-    $('#xray-tint').style.opacity = f === 'hide' ? '0' : '1';
+    $('#xray-tint').style.opacity = f === 'xray' ? '1' : '0';
   });
-  video.style.filter = 'grayscale(1) contrast(1.15) brightness(0.75)';
+  $('#xray-tint').style.opacity = '0';
   ['size', 'y', 'z'].forEach((k) => $(`#cal-${k}`).addEventListener('input', (e) => {
     cal[k] = Number(e.target.value);
     try { localStorage.setItem(CAL_KEY, JSON.stringify(cal)); } catch { /* ignore */ }
