@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Brain Hub</title>
+  <meta name="description" content="Explore the brain, neurons and hormones for A-level Psychology, step by step." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <script>
+    // Apply saved reading settings before first paint (no flash of the wrong font/colour).
+    try {
+      const s = JSON.parse(localStorage.getItem('bh-settings') || '{}');
+      const d = document.documentElement;
+      for (const [k, v] of Object.entries(s)) {
+        if (typeof v === 'string' || typeof v === 'boolean') d.dataset[k] = String(v);
+      }
+      if (s.textSize) d.style.setProperty('--text-scale', s.textSize);
+      if (!s.motion && matchMedia('(prefers-reduced-motion: reduce)').matches) d.dataset.motion = 'reduced';
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="topbar" role="banner">
+    <a class="brand" href="#/" aria-label="Brain Hub home">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><use href="#icon-brain" /></svg>
+      <span>Brain Hub</span>
+    </a>
+    <nav class="topnav" aria-label="Main">
+      <a href="#/explore">Explore</a>
+      <a href="#/xray">X-ray me</a>
+      <a href="#/learn">Lessons</a>
+      <a href="#/words">Key words</a>
+    </nav>
+    <div class="topbar-tools">
+      <div class="level-toggle" role="group" aria-label="How should things be explained?">
+        <button type="button" data-level="simple" aria-pressed="true">Simple</button>
+        <button type="button" data-level="exam" aria-pressed="false">Exam words</button>
+      </div>
+      <button type="button" class="icon-btn" id="settings-btn" aria-haspopup="dialog" aria-controls="settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-settings" /></svg>
+        <span>Settings</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1"></main>
+
+  <div id="readbar" class="readbar" hidden>
+    <button type="button" data-read="prev" aria-label="Read previous sentence">⏮</button>
+    <button type="button" data-read="toggle" aria-label="Pause reading">⏸</button>
+    <button type="button" data-read="stop" aria-label="Stop reading">⏹</button>
+    <span class="readbar-label">Reading aloud</span>
+  </div>
+
+  <div id="live" class="sr-only" aria-live="polite"></div>
+
+  <dialog id="settings" class="settings" aria-labelledby="settings-title"></dialog>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="icon-brain" viewBox="0 0 32 32"><path fill="currentColor" d="M12 3a5 5 0 0 0-4.9 4A5 5 0 0 0 4 15.5a5 5 0 0 0 1.3 7.2A5 5 0 0 0 12 29a3 3 0 0 0 3-3V6a3 3 0 0 0-3-3Zm8 0a3 3 0 0 0-3 3v20a3 3 0 0 0 3 3 5 5 0 0 0 6.7-6.3A5 5 0 0 0 28 15.5 5 5 0 0 0 24.9 7 5 5 0 0 0 20 3Z"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><path fill="currentColor" d="M3 6h11.2a3 3 0 0 1 5.6 0H21v2h-1.2a3 3 0 0 1-5.6 0H3V6Zm14 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM3 16h1.2a3 3 0 0 1 5.6 0H21v2H9.8a3 3 0 0 1-5.6 0H3v-2Zm4 2a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></symbol>
+    <symbol id="icon-speaker" viewBox="0 0 24 24"><path fill="currentColor" d="M4 9h4l5-4v14l-5-4H4V9Zm12.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4Zm-2.5-8.7v2.1a7 7 0 0 1 0 13.2v2.1a9 9 0 0 0 0-17.4Z"/></symbol>
+  </svg>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

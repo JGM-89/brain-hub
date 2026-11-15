@@ -1,0 +1,9 @@
+node_modules/
+web/dist/
+tools/.venv/
+tools/brain_raw.glb
+tools/data/hcp1065_avg_tracts_nifti.zip
+__pycache__/
+tools/data/
+web/public/mediapipe/
+.claude/
