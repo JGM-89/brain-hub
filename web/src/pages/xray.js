@@ -6,6 +6,7 @@ import { BrainViewer } from '../brain/viewer.js';
 import { buildVisualPathway, brainToFaceMatrix, FACE_SCALE } from '../brain/pathway.js';
 import { byId, SOURCES } from '../data/structures.js';
 import { readButton } from '../speech.js';
+import landmarks from '../data/landmarks.json';
 
 const CAL_KEY = 'bh-xray-calibration';
 const LAYERS = {
@@ -84,7 +85,12 @@ export function render(main) {
 
   const head = new THREE.Matrix4();
   const smoothPos = new THREE.Vector3(), smoothQuat = new THREE.Quaternion(), smoothScale = new THREE.Vector3(1, 1, 1);
-  let haveFace = false, lastSeen = 0, blend = {};
+  let haveFace = false, lastSeen = 0, blend = {}, depthFix = 0;
+  // canonical face model positions (cm) of the landmarks we use for size/position correction
+  const CANON = {
+    33: landmarks.canonical_face_cm.eye_outer_33, 263: landmarks.canonical_face_cm.eye_outer_263,
+    168: landmarks.canonical_face_cm.nose_bridge_168,
+  };
 
   const setStatus = (t) => { const s = $('#status'); s.hidden = !t; s.textContent = t || ''; };
 
@@ -197,6 +203,27 @@ export function render(main) {
         const k = 0.45; // smoothing: 0 = frozen, 1 = raw (jittery)
         smoothPos.lerp(p, smoothPos.lengthSq() ? k : 1); smoothQuat.slerp(q, k); smoothScale.lerp(sc, k);
         const faceM = new THREE.Matrix4().compose(smoothPos, smoothQuat, smoothScale);
+        // MediaPipe's metric depth assumes its own camera, which rarely matches a real webcam, so the
+        // brain came out the wrong size. Correct it from what we can actually see: move the head along
+        // the camera ray until the projected eye corners match the detected ones, then nudge the
+        // nose bridge onto the detected nose bridge.
+        const lm = r.faceLandmarks?.[0];
+        if (lm) {
+          const cam = viewer.camera, asp = cam.aspect;
+          const ndc = (i) => new THREE.Vector2((lm[i].x * 2 - 1) * asp, 1 - lm[i].y * 2);
+          const proj = (m, c) => { const v = new THREE.Vector3(...c).applyMatrix4(m).project(cam); return new THREE.Vector2(v.x * asp, v.y); };
+          const cf = CANON;
+          const seen = ndc(33).distanceTo(ndc(263));
+          const drawn = proj(faceM, cf[33]).distanceTo(proj(faceM, cf[263]));
+          if (seen > 0.01 && drawn > 1e-4) {
+            depthFix = depthFix ? depthFix + (drawn / seen - depthFix) * 0.3 : drawn / seen;
+            const pos = new THREE.Vector3().setFromMatrixPosition(faceM).multiplyScalar(depthFix);
+            faceM.setPosition(pos);
+            const a = proj(faceM, cf[168]), o = ndc(168);
+            const zDist = Math.abs(pos.z) || 50, t = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2));
+            faceM.setPosition(pos.add(new THREE.Vector3((o.x - a.x) / asp * zDist * t * asp, (o.y - a.y) * zDist * t, 0)));
+          }
+        }
         const align = brainToFaceMatrix(FACE_SCALE * cal.size, new THREE.Vector3(0, cal.y, cal.z));
         const recentre = new THREE.Matrix4().makeTranslation(viewer.center.x, viewer.center.y, viewer.center.z);
         viewer.root.matrix.copy(faceM).multiply(align).multiply(recentre);
