@@ -1,0 +1,4606 @@
+{
+ "source": "BodyParts3D release 4.0, Database Center for Life Science (DBCLS), Japan. https://dbarchive.biosciencedbc.jp/en/bodyparts3d/",
+ "licence": "CC BY 4.0 (database README_e.html, licence updated 2025-02-25). Attribution: \"BodyParts3D, (c) The Database Center for Life Science licensed under CC Attribution 4.0 International\".",
+ "licence_note": "The 2013 OBJ file headers still state CC BY-SA 2.1 Japan; the database README states the current licence, CC BY 4.0.",
+ "body": "Polygon meshes of one adult male, based on whole-body MRI (the TARO voxel model) and refined/supplemented by medical illustrators (Mitsuhashi et al., 2009, Nucleic Acids Research 37:D782-5).",
+ "coordinates": "BodyParts3D mm (x left, y posterior, z up) -> glTF (x, z, -y).",
+ "processing": "Elements merged per node, decimated with quadric edge collapse (trimesh/fast-simplification); very low-poly parts (testes, bladder, amygdala, pineal) subdivided once or twice for smooth shading. Compressed with gltf-transform meshopt.",
+ "not_in_model": {
+  "ovaries": "The model is of a male body, so there are no ovaries. The lessons say this and mark their usual position with a dashed label only."
+ },
+ "nodes": {
+  "skin": {
+   "label": "Skin",
+   "faces": 100000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2810",
+     "fma": "FMA7163",
+     "name": "Skin"
+    }
+   ]
+  },
+  "cerebrum": {
+   "label": "Cerebrum",
+   "faces": 60000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1732",
+     "fma": "FMA72670",
+     "name": "Left angular gyrus"
+    },
+    {
+     "file": "FJ1733",
+     "fma": "FMA72669",
+     "name": "Right angular gyrus"
+    },
+    {
+     "file": "FJ1744",
+     "fma": "FMA72658",
+     "name": "Left inferior frontal gyrus"
+    },
+    {
+     "file": "FJ1745",
+     "fma": "FMA72657",
+     "name": "Right inferior frontal gyrus"
+    },
+    {
+     "file": "FJ1746",
+     "fma": "FMA72688",
+     "name": "Left inferior temporal gyrus"
+    },
+    {
+     "file": "FJ1747",
+     "fma": "FMA72687",
+     "name": "Right inferior temporal gyrus"
+    },
+    {
+     "file": "FJ1758",
+     "fma": "FMA260794",
+     "name": "White matter of left cerebral hemisphere"
+    },
+    {
+     "file": "FJ1783",
+     "fma": "FMA72690",
+     "name": "Left fusiform gyrus"
+    },
+    {
+     "file": "FJ1784",
+     "fma": "FMA72689",
+     "name": "Right fusiform gyrus"
+    },
+    {
+     "file": "FJ1785",
+     "fma": "FMA72706",
+     "name": "Left parahippocampal gyrus"
+    },
+    {
+     "file": "FJ1786",
+     "fma": "FMA72705",
+     "name": "Right parahippocampal gyrus"
+    },
+    {
+     "file": "FJ1787",
+     "fma": "FMA72656",
+     "name": "Left middle frontal gyrus"
+    },
+    {
+     "file": "FJ1788",
+     "fma": "FMA72655",
+     "name": "Right middle frontal gyrus"
+    },
+    {
+     "file": "FJ1789",
+     "fma": "FMA72686",
+     "name": "Left middle temporal gyrus"
+    },
+    {
+     "file": "FJ1790",
+     "fma": "FMA72685",
+     "name": "Right middle temporal gyrus"
+    },
+    {
+     "file": "FJ1791",
+     "fma": "FMA72976",
+     "name": "Left occipital lobe"
+    },
+    {
+     "file": "FJ1792",
+     "fma": "FMA72975",
+     "name": "Right occipital lobe"
+    },
+    {
+     "file": "FJ1797",
+     "fma": "FMA72666",
+     "name": "Left postcentral gyrus"
+    },
+    {
+     "file": "FJ1798",
+     "fma": "FMA72665",
+     "name": "Right postcentral gyrus"
+    },
+    {
+     "file": "FJ1800",
+     "fma": "FMA72662",
+     "name": "Left precentral gyrus"
+    },
+    {
+     "file": "FJ1801",
+     "fma": "FMA72661",
+     "name": "Right precentral gyrus"
+    },
+    {
+     "file": "FJ1806",
+     "fma": "FMA260791",
+     "name": "White matter of right cerebral hemisphere"
+    },
+    {
+     "file": "FJ1833",
+     "fma": "FMA72654",
+     "name": "Left superior frontal gyrus"
+    },
+    {
+     "file": "FJ1834",
+     "fma": "FMA72653",
+     "name": "Right superior frontal gyrus"
+    },
+    {
+     "file": "FJ1835",
+     "fma": "FMA72672",
+     "name": "Left superior parietal lobule"
+    },
+    {
+     "file": "FJ1836",
+     "fma": "FMA72671",
+     "name": "Right superior parietal lobule"
+    },
+    {
+     "file": "FJ1841",
+     "fma": "FMA72668",
+     "name": "Left supramarginal gyrus"
+    },
+    {
+     "file": "FJ1842",
+     "fma": "FMA72667",
+     "name": "Right supramarginal gyrus"
+    }
+   ]
+  },
+  "cerebellum": {
+   "label": "Cerebellum",
+   "faces": 9000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1781",
+     "fma": "FMA67944",
+     "name": "Cerebellum"
+    },
+    {
+     "file": "FJ1830",
+     "fma": "FMA67944",
+     "name": "Cerebellum"
+    }
+   ]
+  },
+  "brainstem": {
+   "label": "Brainstem",
+   "faces": 7000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1769",
+     "fma": "FMA62004",
+     "name": "Medulla oblongata"
+    },
+    {
+     "file": "FJ1831",
+     "fma": "FMA62004",
+     "name": "Medulla oblongata"
+    },
+    {
+     "file": "FJ1775",
+     "fma": "FMA67943",
+     "name": "Pons"
+    },
+    {
+     "file": "FJ1822",
+     "fma": "FMA67943",
+     "name": "Pons"
+    },
+    {
+     "file": "FJ1770",
+     "fma": "FMA61993",
+     "name": "Midbrain"
+    },
+    {
+     "file": "FJ1817",
+     "fma": "FMA61993",
+     "name": "Midbrain"
+    },
+    {
+     "file": "FJ1762",
+     "fma": "FMA73435",
+     "name": "Left inferior colliculus"
+    },
+    {
+     "file": "FJ1779",
+     "fma": "FMA73423",
+     "name": "Left superior colliculus"
+    },
+    {
+     "file": "FJ1810",
+     "fma": "FMA73434",
+     "name": "Right inferior colliculus"
+    },
+    {
+     "file": "FJ1826",
+     "fma": "FMA73422",
+     "name": "Right superior colliculus"
+    }
+   ]
+  },
+  "hypothalamus": {
+   "label": "Hypothalamus",
+   "faces": 2500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1760",
+     "fma": "FMA62008",
+     "name": "Hypothalamus"
+    },
+    {
+     "file": "FJ1808",
+     "fma": "FMA62008",
+     "name": "Hypothalamus"
+    },
+    {
+     "file": "FJ1780",
+     "fma": "FMA62327",
+     "name": "Tuber cinereum"
+    },
+    {
+     "file": "FJ1828",
+     "fma": "FMA62327",
+     "name": "Tuber cinereum"
+    }
+   ]
+  },
+  "thalamus": {
+   "label": "Thalamus",
+   "faces": 2460,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1782",
+     "fma": "FMA258716",
+     "name": "Left thalamus"
+    },
+    {
+     "file": "FJ1827",
+     "fma": "FMA258714",
+     "name": "Right thalamus"
+    }
+   ]
+  },
+  "amygdala_left": {
+   "label": "Amygdala (left)",
+   "faces": 1500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1753",
+     "fma": "FMA72833",
+     "name": "Left amygdala"
+    }
+   ]
+  },
+  "amygdala_right": {
+   "label": "Amygdala (right)",
+   "faces": 1500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1829",
+     "fma": "FMA72832",
+     "name": "Right amygdala"
+    }
+   ]
+  },
+  "optic_nerves": {
+   "label": "Optic nerves, chiasm and tracts",
+   "faces": 4000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1313",
+     "fma": "FMA50878",
+     "name": "Left optic nerve"
+    },
+    {
+     "file": "FJ1364",
+     "fma": "FMA50875",
+     "name": "Right optic nerve"
+    },
+    {
+     "file": "FJ1771",
+     "fma": "FMA62045",
+     "name": "Optic chiasm"
+    },
+    {
+     "file": "FJ1818",
+     "fma": "FMA62045",
+     "name": "Optic chiasm"
+    },
+    {
+     "file": "FJ1773",
+     "fma": "FMA67936",
+     "name": "Left optic tract"
+    },
+    {
+     "file": "FJ1820",
+     "fma": "FMA62382",
+     "name": "Right optic tract"
+    }
+   ]
+  },
+  "pituitary": {
+   "label": "Pituitary gland",
+   "faces": 1164,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1796",
+     "fma": "FMA13889",
+     "name": "Pituitary gland"
+    }
+   ]
+  },
+  "pineal": {
+   "label": "Pineal gland",
+   "faces": 800,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1795",
+     "fma": "FMA62033",
+     "name": "Pineal body"
+    }
+   ]
+  },
+  "adrenal_left": {
+   "label": "Adrenal gland (left)",
+   "faces": 2500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3129",
+     "fma": "FMA15630",
+     "name": "Left adrenal gland"
+    }
+   ]
+  },
+  "adrenal_right": {
+   "label": "Adrenal gland (right)",
+   "faces": 2294,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3130",
+     "fma": "FMA15629",
+     "name": "Right adrenal gland"
+    }
+   ]
+  },
+  "pancreas": {
+   "label": "Pancreas",
+   "faces": 4000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1895",
+     "fma": "FMA7198",
+     "name": "Pancreas"
+    },
+    {
+     "file": "FJ2629",
+     "fma": "FMA63120",
+     "name": "Parenchyma of pancreas"
+    }
+   ]
+  },
+  "testis_left": {
+   "label": "Testis (left)",
+   "faces": 1500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3138",
+     "fma": "FMA7212",
+     "name": "Left testis"
+    }
+   ]
+  },
+  "testis_right": {
+   "label": "Testis (right)",
+   "faces": 1500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3142",
+     "fma": "FMA7211",
+     "name": "Right testis"
+    }
+   ]
+  },
+  "salivary_left": {
+   "label": "Salivary glands (left)",
+   "faces": 458,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2766",
+     "fma": "FMA59803",
+     "name": "Left submandibular gland"
+    },
+    {
+     "file": "FJ2765",
+     "fma": "FMA59805",
+     "name": "Left sublingual gland"
+    }
+   ]
+  },
+  "salivary_right": {
+   "label": "Salivary glands (right)",
+   "faces": 472,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2768",
+     "fma": "FMA59802",
+     "name": "Right submandibular gland"
+    },
+    {
+     "file": "FJ2767",
+     "fma": "FMA59804",
+     "name": "Right sublingual gland"
+    }
+   ]
+  },
+  "eye_left": {
+   "label": "Eye (left)",
+   "faces": 2500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1282",
+     "fma": "FMA58082",
+     "name": "Anterior chamber of left eyeball"
+    },
+    {
+     "file": "FJ1285",
+     "fma": "FMA58300",
+     "name": "Left choroid"
+    },
+    {
+     "file": "FJ1286",
+     "fma": "FMA58300",
+     "name": "Left choroid"
+    },
+    {
+     "file": "FJ1289",
+     "fma": "FMA58240",
+     "name": "Left cornea"
+    },
+    {
+     "file": "FJ1305",
+     "fma": "FMA58243",
+     "name": "Left lens"
+    },
+    {
+     "file": "FJ1317",
+     "fma": "FMA58272",
+     "name": "Left sclera"
+    },
+    {
+     "file": "FJ1320",
+     "fma": "FMA58840",
+     "name": "Suspensory ligament of left lens"
+    },
+    {
+     "file": "FJ1331",
+     "fma": "FMA58829",
+     "name": "Left vitreous body"
+    }
+   ]
+  },
+  "iris_left": {
+   "label": "Iris (left)",
+   "faces": 800,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1297",
+     "fma": "FMA58237",
+     "name": "Left iris"
+    }
+   ]
+  },
+  "eye_right": {
+   "label": "Eye (right)",
+   "faces": 2500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1336",
+     "fma": "FMA58299",
+     "name": "Right choroid"
+    },
+    {
+     "file": "FJ1337",
+     "fma": "FMA58299",
+     "name": "Right choroid"
+    },
+    {
+     "file": "FJ1340",
+     "fma": "FMA58239",
+     "name": "Right cornea"
+    },
+    {
+     "file": "FJ1356",
+     "fma": "FMA58242",
+     "name": "Right lens"
+    },
+    {
+     "file": "FJ1368",
+     "fma": "FMA58271",
+     "name": "Right sclera"
+    },
+    {
+     "file": "FJ1371",
+     "fma": "FMA58839",
+     "name": "Suspensory ligament of right lens"
+    },
+    {
+     "file": "FJ1382",
+     "fma": "FMA58828",
+     "name": "Right vitreous body"
+    }
+   ]
+  },
+  "iris_right": {
+   "label": "Iris (right)",
+   "faces": 800,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1348",
+     "fma": "FMA58236",
+     "name": "Right iris"
+    }
+   ]
+  },
+  "ciliary_ganglia": {
+   "label": "Ciliary ganglia and short ciliary nerves",
+   "faces": 1200,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1288",
+     "fma": "FMA53550",
+     "name": "Left ciliary ganglion"
+    },
+    {
+     "file": "FJ1339",
+     "fma": "FMA53549",
+     "name": "Right ciliary ganglion"
+    },
+    {
+     "file": "FJ1319",
+     "fma": "FMA7041",
+     "name": "Short ciliary nerve"
+    },
+    {
+     "file": "FJ1370",
+     "fma": "FMA7041",
+     "name": "Short ciliary nerve"
+    }
+   ]
+  },
+  "heart": {
+   "label": "Heart",
+   "faces": 22000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2438",
+     "fma": "FMA9531",
+     "name": "Wall of left atrium"
+    },
+    {
+     "file": "FJ2439",
+     "fma": "FMA9457",
+     "name": "Wall of right atrium"
+    },
+    {
+     "file": "FJ2631",
+     "fma": "FMA74912",
+     "name": "Trunk of anterior interventricular branch of left coronary artery"
+    },
+    {
+     "file": "FJ2632",
+     "fma": "FMA3872",
+     "name": "First right anterior branch of anterior interventricular branch of left coronary artery"
+    },
+    {
+     "file": "FJ2633",
+     "fma": "FMA3860",
+     "name": "Diagonal branch of anterior descending branch of left coronary artery"
+    },
+    {
+     "file": "FJ2634",
+     "fma": "FMA3860",
+     "name": "Diagonal branch of anterior descending branch of left coronary artery"
+    },
+    {
+     "file": "FJ2635",
+     "fma": "FMA3860",
+     "name": "Diagonal branch of anterior descending branch of left coronary artery"
+    },
+    {
+     "file": "FJ2636",
+     "fma": "FMA3860",
+     "name": "Diagonal branch of anterior descending branch of left coronary artery"
+    },
+    {
+     "file": "FJ2637",
+     "fma": "FMA3860",
+     "name": "Diagonal branch of anterior descending branch of left coronary artery"
+    },
+    {
+     "file": "FJ2638",
+     "fma": "FMA3860",
+     "name": "Diagonal branch of anterior descending branch of left coronary artery"
+    },
+    {
+     "file": "FJ2639",
+     "fma": "FMA3860",
+     "name": "Diagonal branch of anterior descending branch of left coronary artery"
+    },
+    {
+     "file": "FJ2640",
+     "fma": "FMA3860",
+     "name": "Diagonal branch of anterior descending branch of left coronary artery"
+    },
+    {
+     "file": "FJ2641",
+     "fma": "FMA3876",
+     "name": "Third right anterior branch of anterior interventricular branch of left coronary artery"
+    },
+    {
+     "file": "FJ2642",
+     "fma": "FMA3860",
+     "name": "Diagonal branch of anterior descending branch of left coronary artery"
+    },
+    {
+     "file": "FJ2643",
+     "fma": "FMA3868",
+     "name": "Conus branch of anterior interventricular branch of left coronary artery"
+    },
+    {
+     "file": "FJ2644",
+     "fma": "FMA3868",
+     "name": "Conus branch of anterior interventricular branch of left coronary artery"
+    },
+    {
+     "file": "FJ2645",
+     "fma": "FMA3872",
+     "name": "First right anterior branch of anterior interventricular branch of left coronary artery"
+    },
+    {
+     "file": "FJ2646",
+     "fma": "FMA3874",
+     "name": "Second right anterior branch of anterior interventricular branch of left coronary artery"
+    },
+    {
+     "file": "FJ2647",
+     "fma": "FMA3876",
+     "name": "Third right anterior branch of anterior interventricular branch of left coronary artery"
+    },
+    {
+     "file": "FJ2648",
+     "fma": "FMA3860",
+     "name": "Diagonal branch of anterior descending branch of left coronary artery"
+    },
+    {
+     "file": "FJ2649",
+     "fma": "FMA3895",
+     "name": "Circumflex branch of left coronary artery"
+    },
+    {
+     "file": "FJ2650",
+     "fma": "FMA3895",
+     "name": "Circumflex branch of left coronary artery"
+    },
+    {
+     "file": "FJ2651",
+     "fma": "FMA3895",
+     "name": "Circumflex branch of left coronary artery"
+    },
+    {
+     "file": "FJ2652",
+     "fma": "FMA3895",
+     "name": "Circumflex branch of left coronary artery"
+    },
+    {
+     "file": "FJ2653",
+     "fma": "FMA3895",
+     "name": "Circumflex branch of left coronary artery"
+    },
+    {
+     "file": "FJ2654",
+     "fma": "FMA3895",
+     "name": "Circumflex branch of left coronary artery"
+    },
+    {
+     "file": "FJ2655",
+     "fma": "FMA4706",
+     "name": "Coronary sinus"
+    },
+    {
+     "file": "FJ2656",
+     "fma": "FMA4707",
+     "name": "Great cardiac vein"
+    },
+    {
+     "file": "FJ2667",
+     "fma": "FMA3818",
+     "name": "Marginal branch of right coronary artery"
+    },
+    {
+     "file": "FJ2668",
+     "fma": "FMA3818",
+     "name": "Marginal branch of right coronary artery"
+    },
+    {
+     "file": "FJ2670",
+     "fma": "FMA3807",
+     "name": "Right conus artery"
+    },
+    {
+     "file": "FJ2671",
+     "fma": "FMA3815",
+     "name": "First anterior ventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2672",
+     "fma": "FMA3818",
+     "name": "Marginal branch of right coronary artery"
+    },
+    {
+     "file": "FJ2673",
+     "fma": "FMA3815",
+     "name": "First anterior ventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2674",
+     "fma": "FMA3818",
+     "name": "Marginal branch of right coronary artery"
+    },
+    {
+     "file": "FJ2675",
+     "fma": "FMA3818",
+     "name": "Marginal branch of right coronary artery"
+    },
+    {
+     "file": "FJ2676",
+     "fma": "FMA3807",
+     "name": "Right conus artery"
+    },
+    {
+     "file": "FJ2677",
+     "fma": "FMA3815",
+     "name": "First anterior ventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2692",
+     "fma": "FMA3840",
+     "name": "Posterior interventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2693",
+     "fma": "FMA3840",
+     "name": "Posterior interventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2694",
+     "fma": "FMA3840",
+     "name": "Posterior interventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2695",
+     "fma": "FMA3840",
+     "name": "Posterior interventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2696",
+     "fma": "FMA3840",
+     "name": "Posterior interventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2697",
+     "fma": "FMA3840",
+     "name": "Posterior interventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2698",
+     "fma": "FMA3840",
+     "name": "Posterior interventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2699",
+     "fma": "FMA3840",
+     "name": "Posterior interventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2700",
+     "fma": "FMA3840",
+     "name": "Posterior interventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2714",
+     "fma": "FMA3837",
+     "name": "First posterior ventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2715",
+     "fma": "FMA3837",
+     "name": "First posterior ventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2716",
+     "fma": "FMA3837",
+     "name": "First posterior ventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2717",
+     "fma": "FMA3837",
+     "name": "First posterior ventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2718",
+     "fma": "FMA3837",
+     "name": "First posterior ventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2719",
+     "fma": "FMA3837",
+     "name": "First posterior ventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2720",
+     "fma": "FMA3837",
+     "name": "First posterior ventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2721",
+     "fma": "FMA3837",
+     "name": "First posterior ventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2722",
+     "fma": "FMA3837",
+     "name": "First posterior ventricular branch of right coronary artery"
+    },
+    {
+     "file": "FJ2723",
+     "fma": "FMA3802",
+     "name": "Trunk of right coronary artery"
+    },
+    {
+     "file": "FJ2724",
+     "fma": "FMA4714",
+     "name": "Small cardiac vein"
+    },
+    {
+     "file": "FJ2727",
+     "fma": "FMA4716",
+     "name": "Right marginal vein"
+    },
+    {
+     "file": "FJ2728",
+     "fma": "FMA4716",
+     "name": "Right marginal vein"
+    },
+    {
+     "file": "FJ2729",
+     "fma": "FMA4716",
+     "name": "Right marginal vein"
+    },
+    {
+     "file": "FJ2731",
+     "fma": "FMA4714",
+     "name": "Small cardiac vein"
+    },
+    {
+     "file": "FJ2737",
+     "fma": "FMA3855",
+     "name": "Trunk of left coronary artery"
+    }
+   ]
+  },
+  "liver": {
+   "label": "Liver",
+   "faces": 14000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2409",
+     "fma": "FMA15745",
+     "name": "Hepatovenous segment VII"
+    },
+    {
+     "file": "FJ2816",
+     "fma": "FMA13365",
+     "name": "Caudate lobe of liver"
+    },
+    {
+     "file": "FJ2818",
+     "fma": "FMA15739",
+     "name": "Hepatovenous segment II"
+    },
+    {
+     "file": "FJ2819",
+     "fma": "FMA15741",
+     "name": "Hepatovenous segment III"
+    },
+    {
+     "file": "FJ2820",
+     "fma": "FMA15742",
+     "name": "Hepatovenous segment IV"
+    },
+    {
+     "file": "FJ2821",
+     "fma": "FMA15743",
+     "name": "Hepatovenous segment V"
+    },
+    {
+     "file": "FJ2822",
+     "fma": "FMA15744",
+     "name": "Hepatovenous segment VI"
+    },
+    {
+     "file": "FJ2823",
+     "fma": "FMA15746",
+     "name": "Hepatovenous segment VIII"
+    },
+    {
+     "file": "FJ2824",
+     "fma": "FMA15746",
+     "name": "Hepatovenous segment VIII"
+    }
+   ]
+  },
+  "stomach": {
+   "label": "Stomach",
+   "faces": 1810,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2564",
+     "fma": "FMA7148",
+     "name": "Stomach"
+    }
+   ]
+  },
+  "esophagus": {
+   "label": "Oesophagus",
+   "faces": 578,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2563",
+     "fma": "FMA7131",
+     "name": "Esophagus"
+    }
+   ]
+  },
+  "small_intestine": {
+   "label": "Small intestine",
+   "faces": 16058,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2573",
+     "fma": "FMA7206",
+     "name": "Duodenum"
+    },
+    {
+     "file": "FJ2574",
+     "fma": "FMA14964",
+     "name": "Proximal part of ileum"
+    },
+    {
+     "file": "FJ2575",
+     "fma": "FMA14964",
+     "name": "Proximal part of ileum"
+    },
+    {
+     "file": "FJ2576",
+     "fma": "FMA14965",
+     "name": "Middle part of ileum"
+    },
+    {
+     "file": "FJ2577",
+     "fma": "FMA14965",
+     "name": "Middle part of ileum"
+    },
+    {
+     "file": "FJ2578",
+     "fma": "FMA14965",
+     "name": "Middle part of ileum"
+    },
+    {
+     "file": "FJ2579",
+     "fma": "FMA14965",
+     "name": "Middle part of ileum"
+    },
+    {
+     "file": "FJ2580",
+     "fma": "FMA14965",
+     "name": "Middle part of ileum"
+    },
+    {
+     "file": "FJ2581",
+     "fma": "FMA14965",
+     "name": "Middle part of ileum"
+    },
+    {
+     "file": "FJ2582",
+     "fma": "FMA14965",
+     "name": "Middle part of ileum"
+    },
+    {
+     "file": "FJ2583",
+     "fma": "FMA14965",
+     "name": "Middle part of ileum"
+    },
+    {
+     "file": "FJ2584",
+     "fma": "FMA14965",
+     "name": "Middle part of ileum"
+    },
+    {
+     "file": "FJ2585",
+     "fma": "FMA14964",
+     "name": "Proximal part of ileum"
+    },
+    {
+     "file": "FJ2586",
+     "fma": "FMA14965",
+     "name": "Middle part of ileum"
+    },
+    {
+     "file": "FJ2587",
+     "fma": "FMA14966",
+     "name": "Distal part of ileum"
+    },
+    {
+     "file": "FJ2588",
+     "fma": "FMA14966",
+     "name": "Distal part of ileum"
+    },
+    {
+     "file": "FJ2589",
+     "fma": "FMA14966",
+     "name": "Distal part of ileum"
+    },
+    {
+     "file": "FJ2590",
+     "fma": "FMA14966",
+     "name": "Distal part of ileum"
+    },
+    {
+     "file": "FJ2591",
+     "fma": "FMA14966",
+     "name": "Distal part of ileum"
+    },
+    {
+     "file": "FJ2592",
+     "fma": "FMA14966",
+     "name": "Distal part of ileum"
+    },
+    {
+     "file": "FJ2593",
+     "fma": "FMA14966",
+     "name": "Distal part of ileum"
+    },
+    {
+     "file": "FJ2594",
+     "fma": "FMA14966",
+     "name": "Distal part of ileum"
+    },
+    {
+     "file": "FJ2595",
+     "fma": "FMA14966",
+     "name": "Distal part of ileum"
+    },
+    {
+     "file": "FJ2596",
+     "fma": "FMA14964",
+     "name": "Proximal part of ileum"
+    },
+    {
+     "file": "FJ2597",
+     "fma": "FMA14966",
+     "name": "Distal part of ileum"
+    },
+    {
+     "file": "FJ2598",
+     "fma": "FMA14966",
+     "name": "Distal part of ileum"
+    },
+    {
+     "file": "FJ2599",
+     "fma": "FMA11338",
+     "name": "Ileocecal junction"
+    },
+    {
+     "file": "FJ2600",
+     "fma": "FMA14964",
+     "name": "Proximal part of ileum"
+    },
+    {
+     "file": "FJ2601",
+     "fma": "FMA14964",
+     "name": "Proximal part of ileum"
+    },
+    {
+     "file": "FJ2602",
+     "fma": "FMA14964",
+     "name": "Proximal part of ileum"
+    },
+    {
+     "file": "FJ2603",
+     "fma": "FMA14964",
+     "name": "Proximal part of ileum"
+    },
+    {
+     "file": "FJ2604",
+     "fma": "FMA14964",
+     "name": "Proximal part of ileum"
+    },
+    {
+     "file": "FJ2605",
+     "fma": "FMA14964",
+     "name": "Proximal part of ileum"
+    },
+    {
+     "file": "FJ2606",
+     "fma": "FMA16981",
+     "name": "Proximal part of jejunum"
+    },
+    {
+     "file": "FJ2607",
+     "fma": "FMA16982",
+     "name": "Middle part of jejunum"
+    },
+    {
+     "file": "FJ2608",
+     "fma": "FMA16982",
+     "name": "Middle part of jejunum"
+    },
+    {
+     "file": "FJ2609",
+     "fma": "FMA16982",
+     "name": "Middle part of jejunum"
+    },
+    {
+     "file": "FJ2610",
+     "fma": "FMA16982",
+     "name": "Middle part of jejunum"
+    },
+    {
+     "file": "FJ2611",
+     "fma": "FMA16983",
+     "name": "Distal part of jejunum"
+    },
+    {
+     "file": "FJ2612",
+     "fma": "FMA16983",
+     "name": "Distal part of jejunum"
+    },
+    {
+     "file": "FJ2613",
+     "fma": "FMA16983",
+     "name": "Distal part of jejunum"
+    },
+    {
+     "file": "FJ2614",
+     "fma": "FMA16983",
+     "name": "Distal part of jejunum"
+    },
+    {
+     "file": "FJ2615",
+     "fma": "FMA16983",
+     "name": "Distal part of jejunum"
+    },
+    {
+     "file": "FJ2616",
+     "fma": "FMA16983",
+     "name": "Distal part of jejunum"
+    },
+    {
+     "file": "FJ2617",
+     "fma": "FMA16981",
+     "name": "Proximal part of jejunum"
+    },
+    {
+     "file": "FJ2618",
+     "fma": "FMA16983",
+     "name": "Distal part of jejunum"
+    },
+    {
+     "file": "FJ2619",
+     "fma": "FMA16983",
+     "name": "Distal part of jejunum"
+    },
+    {
+     "file": "FJ2620",
+     "fma": "FMA16983",
+     "name": "Distal part of jejunum"
+    },
+    {
+     "file": "FJ2621",
+     "fma": "FMA16983",
+     "name": "Distal part of jejunum"
+    },
+    {
+     "file": "FJ2622",
+     "fma": "FMA16981",
+     "name": "Proximal part of jejunum"
+    },
+    {
+     "file": "FJ2623",
+     "fma": "FMA16981",
+     "name": "Proximal part of jejunum"
+    },
+    {
+     "file": "FJ2624",
+     "fma": "FMA16981",
+     "name": "Proximal part of jejunum"
+    },
+    {
+     "file": "FJ2625",
+     "fma": "FMA16981",
+     "name": "Proximal part of jejunum"
+    },
+    {
+     "file": "FJ2626",
+     "fma": "FMA16981",
+     "name": "Proximal part of jejunum"
+    },
+    {
+     "file": "FJ2627",
+     "fma": "FMA16981",
+     "name": "Proximal part of jejunum"
+    },
+    {
+     "file": "FJ2628",
+     "fma": "FMA16982",
+     "name": "Middle part of jejunum"
+    }
+   ]
+  },
+  "large_intestine": {
+   "label": "Large intestine",
+   "faces": 9000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2566",
+     "fma": "FMA14545",
+     "name": "Ascending colon"
+    },
+    {
+     "file": "FJ2567",
+     "fma": "FMA14547",
+     "name": "Descending colon"
+    },
+    {
+     "file": "FJ2568",
+     "fma": "FMA15044",
+     "name": "Taenia libera"
+    },
+    {
+     "file": "FJ2569",
+     "fma": "FMA15042",
+     "name": "Taenia mesocolica"
+    },
+    {
+     "file": "FJ2570",
+     "fma": "FMA15043",
+     "name": "Taenia omentalis"
+    },
+    {
+     "file": "FJ2571",
+     "fma": "FMA14544",
+     "name": "Rectum"
+    },
+    {
+     "file": "FJ2572",
+     "fma": "FMA14546",
+     "name": "Transverse colon"
+    },
+    {
+     "file": "FJ2599",
+     "fma": "FMA11338",
+     "name": "Ileocecal junction"
+    }
+   ]
+  },
+  "kidney_left": {
+   "label": "Kidney (left)",
+   "faces": 2982,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3145",
+     "fma": "FMA7205",
+     "name": "Left kidney"
+    }
+   ]
+  },
+  "kidney_right": {
+   "label": "Kidney (right)",
+   "faces": 2310,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3147",
+     "fma": "FMA7204",
+     "name": "Right kidney"
+    }
+   ]
+  },
+  "ureters": {
+   "label": "Ureters",
+   "faces": 1500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3144",
+     "fma": "FMA15572",
+     "name": "Left ureter"
+    },
+    {
+     "file": "FJ3146",
+     "fma": "FMA15571",
+     "name": "Right ureter"
+    }
+   ]
+  },
+  "bladder": {
+   "label": "Bladder",
+   "faces": 2500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3149",
+     "fma": "FMA15900",
+     "name": "Urinary bladder"
+    }
+   ]
+  },
+  "spleen": {
+   "label": "Spleen",
+   "faces": 1330,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2561",
+     "fma": "FMA7196",
+     "name": "Spleen"
+    }
+   ]
+  },
+  "airways": {
+   "label": "Windpipe and bronchi",
+   "faces": 16000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2441",
+     "fma": "FMA68227",
+     "name": "Inferior lingular bronchial tree"
+    },
+    {
+     "file": "FJ2442",
+     "fma": "FMA68230",
+     "name": "Left medial basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2443",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2444",
+     "fma": "FMA68223",
+     "name": "Left apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2445",
+     "fma": "FMA68232",
+     "name": "Left lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2446",
+     "fma": "FMA68233",
+     "name": "Left posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2447",
+     "fma": "FMA68225",
+     "name": "Left posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2448",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2449",
+     "fma": "FMA68215",
+     "name": "Lateral segmental bronchial tree"
+    },
+    {
+     "file": "FJ2450",
+     "fma": "FMA7396",
+     "name": "Left main bronchus"
+    },
+    {
+     "file": "FJ2451",
+     "fma": "FMA68214",
+     "name": "Medial segmental bronchial tree"
+    },
+    {
+     "file": "FJ2452",
+     "fma": "FMA68321",
+     "name": "Right anterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2453",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2454",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2455",
+     "fma": "FMA68220",
+     "name": "Right lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2456",
+     "fma": "FMA68218",
+     "name": "Right medial basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2457",
+     "fma": "FMA68221",
+     "name": "Right posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2458",
+     "fma": "FMA68213",
+     "name": "Right posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2459",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2460",
+     "fma": "FMA68223",
+     "name": "Left apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2461",
+     "fma": "FMA68223",
+     "name": "Left apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2462",
+     "fma": "FMA68223",
+     "name": "Left apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2463",
+     "fma": "FMA68223",
+     "name": "Left apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2464",
+     "fma": "FMA68223",
+     "name": "Left apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2465",
+     "fma": "FMA68225",
+     "name": "Left posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2466",
+     "fma": "FMA68225",
+     "name": "Left posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2467",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2468",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2469",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2470",
+     "fma": "FMA68221",
+     "name": "Right posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2471",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2472",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2473",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2474",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2475",
+     "fma": "FMA68227",
+     "name": "Inferior lingular bronchial tree"
+    },
+    {
+     "file": "FJ2476",
+     "fma": "FMA68226",
+     "name": "Superior lingular bronchial tree"
+    },
+    {
+     "file": "FJ2477",
+     "fma": "FMA68226",
+     "name": "Superior lingular bronchial tree"
+    },
+    {
+     "file": "FJ2478",
+     "fma": "FMA68226",
+     "name": "Superior lingular bronchial tree"
+    },
+    {
+     "file": "FJ2479",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2480",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2481",
+     "fma": "FMA68221",
+     "name": "Right posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2482",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2483",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2484",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2485",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2486",
+     "fma": "FMA68221",
+     "name": "Right posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2487",
+     "fma": "FMA68221",
+     "name": "Right posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2488",
+     "fma": "FMA68218",
+     "name": "Right medial basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2489",
+     "fma": "FMA68221",
+     "name": "Right posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2490",
+     "fma": "FMA68220",
+     "name": "Right lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2491",
+     "fma": "FMA68220",
+     "name": "Right lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2492",
+     "fma": "FMA68220",
+     "name": "Right lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2493",
+     "fma": "FMA68321",
+     "name": "Right anterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2494",
+     "fma": "FMA68321",
+     "name": "Right anterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2495",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2496",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2497",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2498",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2499",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2500",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2501",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2502",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2503",
+     "fma": "FMA68215",
+     "name": "Lateral segmental bronchial tree"
+    },
+    {
+     "file": "FJ2504",
+     "fma": "FMA68215",
+     "name": "Lateral segmental bronchial tree"
+    },
+    {
+     "file": "FJ2505",
+     "fma": "FMA68215",
+     "name": "Lateral segmental bronchial tree"
+    },
+    {
+     "file": "FJ2506",
+     "fma": "FMA68214",
+     "name": "Medial segmental bronchial tree"
+    },
+    {
+     "file": "FJ2507",
+     "fma": "FMA68214",
+     "name": "Medial segmental bronchial tree"
+    },
+    {
+     "file": "FJ2508",
+     "fma": "FMA68214",
+     "name": "Medial segmental bronchial tree"
+    },
+    {
+     "file": "FJ2509",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2510",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2511",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2512",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2513",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2514",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2515",
+     "fma": "FMA68213",
+     "name": "Right posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2516",
+     "fma": "FMA68213",
+     "name": "Right posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2517",
+     "fma": "FMA68213",
+     "name": "Right posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2518",
+     "fma": "FMA68213",
+     "name": "Right posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2519",
+     "fma": "FMA68213",
+     "name": "Right posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2520",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2521",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2522",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2523",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2524",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2525",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2526",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2527",
+     "fma": "FMA68233",
+     "name": "Left posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2528",
+     "fma": "FMA68233",
+     "name": "Left posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2529",
+     "fma": "FMA68233",
+     "name": "Left posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2530",
+     "fma": "FMA68233",
+     "name": "Left posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2531",
+     "fma": "FMA68233",
+     "name": "Left posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2532",
+     "fma": "FMA68232",
+     "name": "Left lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2533",
+     "fma": "FMA68232",
+     "name": "Left lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2534",
+     "fma": "FMA68232",
+     "name": "Left lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2535",
+     "fma": "FMA68231",
+     "name": "Left anterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2536",
+     "fma": "FMA68231",
+     "name": "Left anterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2537",
+     "fma": "FMA68230",
+     "name": "Left medial basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2538",
+     "fma": "FMA68231",
+     "name": "Left anterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2539",
+     "fma": "FMA68418",
+     "name": "Right main bronchus proper"
+    },
+    {
+     "file": "FJ2540",
+     "fma": "FMA68226",
+     "name": "Superior lingular bronchial tree"
+    },
+    {
+     "file": "FJ2541",
+     "fma": "FMA7394",
+     "name": "Trachea"
+    }
+   ]
+  },
+  "muscle_arm_left": {
+   "label": "Biceps (left arm)",
+   "faces": 2500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1478M",
+     "fma": "FMA37687",
+     "name": "Long head of left biceps brachii"
+    },
+    {
+     "file": "FJ1512M",
+     "fma": "FMA37685",
+     "name": "Short head of left biceps brachii"
+    }
+   ]
+  },
+  "muscle_arm_right": {
+   "label": "Biceps (right arm)",
+   "faces": 2500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1478",
+     "fma": "FMA37686",
+     "name": "Long head of right biceps brachii"
+    },
+    {
+     "file": "FJ1512",
+     "fma": "FMA37684",
+     "name": "Short head of right biceps brachii"
+    }
+   ]
+  },
+  "muscle_thigh_left": {
+   "label": "Quadriceps (left thigh)",
+   "faces": 5000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1433M",
+     "fma": "FMA38929",
+     "name": "Left rectus femoris"
+    },
+    {
+     "file": "FJ1441M",
+     "fma": "FMA38935",
+     "name": "Left vastus intermedius"
+    },
+    {
+     "file": "FJ1442M",
+     "fma": "FMA38931",
+     "name": "Left vastus lateralis"
+    },
+    {
+     "file": "FJ1443M",
+     "fma": "FMA38933",
+     "name": "Left vastus medialis"
+    }
+   ]
+  },
+  "muscle_thigh_right": {
+   "label": "Quadriceps (right thigh)",
+   "faces": 5000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1433",
+     "fma": "FMA38928",
+     "name": "Right rectus femoris"
+    },
+    {
+     "file": "FJ1441",
+     "fma": "FMA38934",
+     "name": "Right vastus intermedius"
+    },
+    {
+     "file": "FJ1442",
+     "fma": "FMA38930",
+     "name": "Right vastus lateralis"
+    },
+    {
+     "file": "FJ1443",
+     "fma": "FMA38932",
+     "name": "Right vastus medialis"
+    }
+   ]
+  },
+  "muscle_calf_left": {
+   "label": "Calf muscle (left)",
+   "faces": 2500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1394M",
+     "fma": "FMA45961",
+     "name": "Lateral head of left gastrocnemius"
+    },
+    {
+     "file": "FJ1397M",
+     "fma": "FMA45958",
+     "name": "Medial head of left gastrocnemius"
+    }
+   ]
+  },
+  "muscle_calf_right": {
+   "label": "Calf muscle (right)",
+   "faces": 2500,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1394",
+     "fma": "FMA45960",
+     "name": "Lateral head of right gastrocnemius"
+    },
+    {
+     "file": "FJ1397",
+     "fma": "FMA45957",
+     "name": "Medial head of right gastrocnemius"
+    }
+   ]
+  },
+  "spine": {
+   "label": "Backbone (vertebral column)",
+   "faces": 26000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3154",
+     "fma": "FMA10037",
+     "name": "Tenth thoracic vertebra"
+    },
+    {
+     "file": "FJ3155",
+     "fma": "FMA10059",
+     "name": "Eleventh thoracic vertebra"
+    },
+    {
+     "file": "FJ3156",
+     "fma": "FMA10081",
+     "name": "Twelfth thoracic vertebra"
+    },
+    {
+     "file": "FJ3157",
+     "fma": "FMA13072",
+     "name": "First lumbar vertebra"
+    },
+    {
+     "file": "FJ3158",
+     "fma": "FMA9165",
+     "name": "First thoracic vertebra"
+    },
+    {
+     "file": "FJ3159",
+     "fma": "FMA13073",
+     "name": "Second lumbar vertebra"
+    },
+    {
+     "file": "FJ3160",
+     "fma": "FMA9187",
+     "name": "Second thoracic vertebra"
+    },
+    {
+     "file": "FJ3161",
+     "fma": "FMA12521",
+     "name": "Third cervical vertebra"
+    },
+    {
+     "file": "FJ3162",
+     "fma": "FMA13074",
+     "name": "Third lumbar vertebra"
+    },
+    {
+     "file": "FJ3163",
+     "fma": "FMA9209",
+     "name": "Third thoracic vertebra"
+    },
+    {
+     "file": "FJ3164",
+     "fma": "FMA12522",
+     "name": "Fourth cervical vertebra"
+    },
+    {
+     "file": "FJ3165",
+     "fma": "FMA13075",
+     "name": "Fourth lumbar vertebra"
+    },
+    {
+     "file": "FJ3166",
+     "fma": "FMA9248",
+     "name": "Fourth thoracic vertebra"
+    },
+    {
+     "file": "FJ3167",
+     "fma": "FMA12523",
+     "name": "Fifth cervical vertebra"
+    },
+    {
+     "file": "FJ3168",
+     "fma": "FMA13076",
+     "name": "Fifth lumbar vertebra"
+    },
+    {
+     "file": "FJ3169",
+     "fma": "FMA9922",
+     "name": "Fifth thoracic vertebra"
+    },
+    {
+     "file": "FJ3170",
+     "fma": "FMA12524",
+     "name": "Sixth cervical vertebra"
+    },
+    {
+     "file": "FJ3171",
+     "fma": "FMA9945",
+     "name": "Sixth thoracic vertebra"
+    },
+    {
+     "file": "FJ3172",
+     "fma": "FMA12525",
+     "name": "Seventh cervical vertebra"
+    },
+    {
+     "file": "FJ3173",
+     "fma": "FMA9968",
+     "name": "Seventh thoracic vertebra"
+    },
+    {
+     "file": "FJ3174",
+     "fma": "FMA9991",
+     "name": "Eighth thoracic vertebra"
+    },
+    {
+     "file": "FJ3175",
+     "fma": "FMA10014",
+     "name": "Ninth thoracic vertebra"
+    },
+    {
+     "file": "FJ3176",
+     "fma": "FMA12519",
+     "name": "Atlas"
+    },
+    {
+     "file": "FJ3177",
+     "fma": "FMA12520",
+     "name": "Axis"
+    },
+    {
+     "file": "FJ3202",
+     "fma": "FMA25058",
+     "name": "Intervertebral disk of axis"
+    },
+    {
+     "file": "FJ3203",
+     "fma": "FMA13501",
+     "name": "Intervertebral disk of fourth thoracic vertebra"
+    },
+    {
+     "file": "FJ3204",
+     "fma": "FMA13502",
+     "name": "Intervertebral disk of fifth thoracic vertebra"
+    },
+    {
+     "file": "FJ3205",
+     "fma": "FMA13503",
+     "name": "Intervertebral disk of sixth thoracic vertebra"
+    },
+    {
+     "file": "FJ3206",
+     "fma": "FMA13504",
+     "name": "Intervertebral disk of seventh thoracic vertebra"
+    },
+    {
+     "file": "FJ3207",
+     "fma": "FMA13505",
+     "name": "Intervertebral disk of eighth thoracic vertebra"
+    },
+    {
+     "file": "FJ3208",
+     "fma": "FMA13506",
+     "name": "Intervertebral disk of ninth thoracic vertebra"
+    },
+    {
+     "file": "FJ3209",
+     "fma": "FMA13507",
+     "name": "Intervertebral disk of tenth thoracic vertebra"
+    },
+    {
+     "file": "FJ3210",
+     "fma": "FMA13508",
+     "name": "Intervertebral disk of eleventh thoracic vertebra"
+    },
+    {
+     "file": "FJ3211",
+     "fma": "FMA10446",
+     "name": "Intervertebral disk"
+    },
+    {
+     "file": "FJ3212",
+     "fma": "FMA16033",
+     "name": "Intervertebral disk of first lumbar vertebra"
+    },
+    {
+     "file": "FJ3213",
+     "fma": "FMA13896",
+     "name": "Intervertebral disk of third cervical vertebra"
+    },
+    {
+     "file": "FJ3214",
+     "fma": "FMA16034",
+     "name": "Intervertebral disk of second lumbar vertebra"
+    },
+    {
+     "file": "FJ3215",
+     "fma": "FMA16035",
+     "name": "Intervertebral disk of third lumbar vertebra"
+    },
+    {
+     "file": "FJ3216",
+     "fma": "FMA16036",
+     "name": "Intervertebral disk of fourth lumbar vertebra"
+    },
+    {
+     "file": "FJ3217",
+     "fma": "FMA16037",
+     "name": "Intervertebral disk of fifth lumbar vertebra"
+    },
+    {
+     "file": "FJ3218",
+     "fma": "FMA13897",
+     "name": "Intervertebral disk of fourth cervical vertebra"
+    },
+    {
+     "file": "FJ3219",
+     "fma": "FMA13898",
+     "name": "Intervertebral disk of fifth cervical vertebra"
+    },
+    {
+     "file": "FJ3220",
+     "fma": "FMA13899",
+     "name": "Intervertebral disk of sixth cervical vertebra"
+    },
+    {
+     "file": "FJ3221",
+     "fma": "FMA13900",
+     "name": "Intervertebral disk of seventh cervical vertebra"
+    },
+    {
+     "file": "FJ3222",
+     "fma": "FMA10458",
+     "name": "Intervertebral disk of first thoracic vertebra"
+    },
+    {
+     "file": "FJ3223",
+     "fma": "FMA13495",
+     "name": "Intervertebral disk of second thoracic vertebra"
+    },
+    {
+     "file": "FJ3224",
+     "fma": "FMA13500",
+     "name": "Intervertebral disk of third thoracic vertebra"
+    },
+    {
+     "file": "FJ3393",
+     "fma": "FMA16202",
+     "name": "Sacrum"
+    }
+   ]
+  },
+  "skull": {
+   "label": "Skull",
+   "faces": 16000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2772",
+     "fma": "FMA52749",
+     "name": "Hyoid bone"
+    },
+    {
+     "file": "FJ3199",
+     "fma": "FMA52740",
+     "name": "Ethmoid"
+    },
+    {
+     "file": "FJ3200",
+     "fma": "FMA52734",
+     "name": "Frontal bone"
+    },
+    {
+     "file": "FJ3201",
+     "fma": "FMA52749",
+     "name": "Hyoid bone"
+    },
+    {
+     "file": "FJ3263",
+     "fma": "FMA54738",
+     "name": "Left inferior nasal concha"
+    },
+    {
+     "file": "FJ3265",
+     "fma": "FMA53646",
+     "name": "Left lacrimal bone"
+    },
+    {
+     "file": "FJ3269",
+     "fma": "FMA53650",
+     "name": "Left maxilla"
+    },
+    {
+     "file": "FJ3272",
+     "fma": "FMA53648",
+     "name": "Left nasal bone"
+    },
+    {
+     "file": "FJ3273",
+     "fma": "FMA53656",
+     "name": "Left palatine bone"
+    },
+    {
+     "file": "FJ3274",
+     "fma": "FMA52789",
+     "name": "Left parietal bone"
+    },
+    {
+     "file": "FJ3281",
+     "fma": "FMA52739",
+     "name": "Left temporal bone"
+    },
+    {
+     "file": "FJ3287",
+     "fma": "FMA52893",
+     "name": "Left zygomatic bone"
+    },
+    {
+     "file": "FJ3289",
+     "fma": "FMA52748",
+     "name": "Mandible"
+    },
+    {
+     "file": "FJ3309",
+     "fma": "FMA52735",
+     "name": "Occipital bone"
+    },
+    {
+     "file": "FJ3369",
+     "fma": "FMA54737",
+     "name": "Right inferior nasal concha"
+    },
+    {
+     "file": "FJ3371",
+     "fma": "FMA53645",
+     "name": "Right lacrimal bone"
+    },
+    {
+     "file": "FJ3375",
+     "fma": "FMA53649",
+     "name": "Right maxilla"
+    },
+    {
+     "file": "FJ3378",
+     "fma": "FMA53647",
+     "name": "Right nasal bone"
+    },
+    {
+     "file": "FJ3379",
+     "fma": "FMA53655",
+     "name": "Right palatine bone"
+    },
+    {
+     "file": "FJ3380",
+     "fma": "FMA52788",
+     "name": "Right parietal bone"
+    },
+    {
+     "file": "FJ3386",
+     "fma": "FMA52738",
+     "name": "Right temporal bone"
+    },
+    {
+     "file": "FJ3392",
+     "fma": "FMA52892",
+     "name": "Right zygomatic bone"
+    },
+    {
+     "file": "FJ3394",
+     "fma": "FMA52736",
+     "name": "Sphenoid bone"
+    },
+    {
+     "file": "FJ3395",
+     "fma": "FMA9710",
+     "name": "Vomer"
+    }
+   ]
+  },
+  "ribcage": {
+   "label": "Ribs and breastbone",
+   "faces": 18000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3153",
+     "fma": "FMA7488",
+     "name": "Xiphoid process"
+    },
+    {
+     "file": "FJ3178",
+     "fma": "FMA7487",
+     "name": "Body of sternum"
+    },
+    {
+     "file": "FJ3225",
+     "fma": "FMA8472",
+     "name": "Left tenth rib"
+    },
+    {
+     "file": "FJ3226",
+     "fma": "FMA8532",
+     "name": "Left eleventh rib"
+    },
+    {
+     "file": "FJ3227",
+     "fma": "FMA8534",
+     "name": "Left twelfth rib"
+    },
+    {
+     "file": "FJ3228",
+     "fma": "FMA7987",
+     "name": "Left first rib"
+    },
+    {
+     "file": "FJ3229",
+     "fma": "FMA8012",
+     "name": "Left second rib"
+    },
+    {
+     "file": "FJ3230",
+     "fma": "FMA8039",
+     "name": "Left third rib"
+    },
+    {
+     "file": "FJ3231",
+     "fma": "FMA8148",
+     "name": "Left fourth rib"
+    },
+    {
+     "file": "FJ3232",
+     "fma": "FMA8093",
+     "name": "Left fifth rib"
+    },
+    {
+     "file": "FJ3233",
+     "fma": "FMA8202",
+     "name": "Left sixth rib"
+    },
+    {
+     "file": "FJ3234",
+     "fma": "FMA8256",
+     "name": "Left seventh rib"
+    },
+    {
+     "file": "FJ3235",
+     "fma": "FMA8310",
+     "name": "Left eighth rib"
+    },
+    {
+     "file": "FJ3236",
+     "fma": "FMA8391",
+     "name": "Left ninth rib"
+    },
+    {
+     "file": "FJ3239",
+     "fma": "FMA8005",
+     "name": "Left first costal cartilage"
+    },
+    {
+     "file": "FJ3242",
+     "fma": "FMA8031",
+     "name": "Left second costal cartilage"
+    },
+    {
+     "file": "FJ3245",
+     "fma": "FMA8058",
+     "name": "Left third costal cartilage"
+    },
+    {
+     "file": "FJ3248",
+     "fma": "FMA8167",
+     "name": "Left fourth costal cartilage"
+    },
+    {
+     "file": "FJ3251",
+     "fma": "FMA8112",
+     "name": "Left fifth costal cartilage"
+    },
+    {
+     "file": "FJ3254",
+     "fma": "FMA8221",
+     "name": "Left sixth costal cartilage"
+    },
+    {
+     "file": "FJ3255",
+     "fma": "FMA8275",
+     "name": "Left seventh costal cartilage"
+    },
+    {
+     "file": "FJ3290",
+     "fma": "FMA7486",
+     "name": "Manubrium"
+    },
+    {
+     "file": "FJ3330",
+     "fma": "FMA8445",
+     "name": "Right tenth rib"
+    },
+    {
+     "file": "FJ3331",
+     "fma": "FMA8531",
+     "name": "Right eleventh rib"
+    },
+    {
+     "file": "FJ3332",
+     "fma": "FMA8533",
+     "name": "Right twelfth rib"
+    },
+    {
+     "file": "FJ3333",
+     "fma": "FMA7875",
+     "name": "Right first costal cartilage"
+    },
+    {
+     "file": "FJ3334",
+     "fma": "FMA7857",
+     "name": "Right first rib"
+    },
+    {
+     "file": "FJ3335",
+     "fma": "FMA7886",
+     "name": "Right second costal cartilage"
+    },
+    {
+     "file": "FJ3336",
+     "fma": "FMA7882",
+     "name": "Right second rib"
+    },
+    {
+     "file": "FJ3337",
+     "fma": "FMA7913",
+     "name": "Right third costal cartilage"
+    },
+    {
+     "file": "FJ3338",
+     "fma": "FMA7909",
+     "name": "Right third rib"
+    },
+    {
+     "file": "FJ3339",
+     "fma": "FMA7976",
+     "name": "Right fourth costal cartilage"
+    },
+    {
+     "file": "FJ3340",
+     "fma": "FMA7957",
+     "name": "Right fourth rib"
+    },
+    {
+     "file": "FJ3341",
+     "fma": "FMA8070",
+     "name": "Right fifth costal cartilage"
+    },
+    {
+     "file": "FJ3342",
+     "fma": "FMA8066",
+     "name": "Right fifth rib"
+    },
+    {
+     "file": "FJ3343",
+     "fma": "FMA8194",
+     "name": "Right sixth costal cartilage"
+    },
+    {
+     "file": "FJ3344",
+     "fma": "FMA8175",
+     "name": "Right sixth rib"
+    },
+    {
+     "file": "FJ3345",
+     "fma": "FMA8248",
+     "name": "Right seventh costal cartilage"
+    },
+    {
+     "file": "FJ3346",
+     "fma": "FMA8229",
+     "name": "Right seventh rib"
+    },
+    {
+     "file": "FJ3347",
+     "fma": "FMA8283",
+     "name": "Right eighth rib"
+    },
+    {
+     "file": "FJ3348",
+     "fma": "FMA8364",
+     "name": "Right ninth rib"
+    }
+   ]
+  },
+  "pelvis": {
+   "label": "Pelvis",
+   "faces": 4706,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3152",
+     "fma": "FMA16586",
+     "name": "Right hip bone"
+    },
+    {
+     "file": "FJ3288",
+     "fma": "FMA16587",
+     "name": "Left hip bone"
+    }
+   ]
+  },
+  "limb_bones": {
+   "label": "Arm and leg bones",
+   "faces": 14000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3262",
+     "fma": "FMA23131",
+     "name": "Left humerus"
+    },
+    {
+     "file": "FJ3368",
+     "fma": "FMA23130",
+     "name": "Right humerus"
+    },
+    {
+     "file": "FJ3277",
+     "fma": "FMA23465",
+     "name": "Left radius"
+    },
+    {
+     "file": "FJ3349",
+     "fma": "FMA23464",
+     "name": "Right radius"
+    },
+    {
+     "file": "FJ3286",
+     "fma": "FMA23468",
+     "name": "Left ulna"
+    },
+    {
+     "file": "FJ3391",
+     "fma": "FMA23467",
+     "name": "Right ulna"
+    },
+    {
+     "file": "FJ3259",
+     "fma": "FMA24475",
+     "name": "Left femur"
+    },
+    {
+     "file": "FJ3365",
+     "fma": "FMA24474",
+     "name": "Right femur"
+    },
+    {
+     "file": "FJ3282",
+     "fma": "FMA24478",
+     "name": "Left tibia"
+    },
+    {
+     "file": "FJ3387",
+     "fma": "FMA24477",
+     "name": "Right tibia"
+    },
+    {
+     "file": "FJ3260",
+     "fma": "FMA24481",
+     "name": "Left fibula"
+    },
+    {
+     "file": "FJ3366",
+     "fma": "FMA24480",
+     "name": "Right fibula"
+    },
+    {
+     "file": "FJ3237",
+     "fma": "FMA13323",
+     "name": "Left clavicle"
+    },
+    {
+     "file": "FJ3362",
+     "fma": "FMA13322",
+     "name": "Right clavicle"
+    },
+    {
+     "file": "FJ3279",
+     "fma": "FMA13396",
+     "name": "Left scapula"
+    },
+    {
+     "file": "FJ3384",
+     "fma": "FMA13395",
+     "name": "Right scapula"
+    }
+   ]
+  },
+  "arteries": {
+   "label": "Arteries",
+   "faces": 22000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1682",
+     "fma": "FMA3949",
+     "name": "Right internal carotid artery"
+    },
+    {
+     "file": "FJ1682M",
+     "fma": "FMA4062",
+     "name": "Left internal carotid artery"
+    },
+    {
+     "file": "FJ1931",
+     "fma": "FMA87217",
+     "name": "Descending thoracic aorta"
+    },
+    {
+     "file": "FJ1932",
+     "fma": "FMA3789",
+     "name": "Abdominal aorta"
+    },
+    {
+     "file": "FJ2074",
+     "fma": "FMA70250",
+     "name": "Left femoral artery"
+    },
+    {
+     "file": "FJ2086",
+     "fma": "FMA77381",
+     "name": "Left popliteal artery"
+    },
+    {
+     "file": "FJ2143",
+     "fma": "FMA70249",
+     "name": "Right femoral artery"
+    },
+    {
+     "file": "FJ2170",
+     "fma": "FMA77380",
+     "name": "Right popliteal artery"
+    },
+    {
+     "file": "FJ2216",
+     "fma": "FMA22656",
+     "name": "Left axillary artery"
+    },
+    {
+     "file": "FJ2219",
+     "fma": "FMA22692",
+     "name": "Left brachial artery"
+    },
+    {
+     "file": "FJ2242",
+     "fma": "FMA22734",
+     "name": "Left radial artery"
+    },
+    {
+     "file": "FJ2258",
+     "fma": "FMA22798",
+     "name": "Left ulnar artery"
+    },
+    {
+     "file": "FJ2268",
+     "fma": "FMA22655",
+     "name": "Right axillary artery"
+    },
+    {
+     "file": "FJ2271",
+     "fma": "FMA22691",
+     "name": "Right brachial artery"
+    },
+    {
+     "file": "FJ2294",
+     "fma": "FMA22733",
+     "name": "Right radial artery"
+    },
+    {
+     "file": "FJ2310",
+     "fma": "FMA22797",
+     "name": "Right ulnar artery"
+    },
+    {
+     "file": "FJ3078",
+     "fma": "FMA14771",
+     "name": "Common hepatic artery"
+    },
+    {
+     "file": "FJ3081",
+     "fma": "FMA14772",
+     "name": "Hepatic artery proper"
+    },
+    {
+     "file": "FJ3411",
+     "fma": "FMA3768",
+     "name": "Arch of aorta"
+    },
+    {
+     "file": "FJ3413",
+     "fma": "FMA3736",
+     "name": "Ascending aorta"
+    },
+    {
+     "file": "FJ3417",
+     "fma": "FMA3932",
+     "name": "Brachiocephalic artery"
+    },
+    {
+     "file": "FJ3421",
+     "fma": "FMA14812",
+     "name": "Celiac trunk"
+    },
+    {
+     "file": "FJ3427",
+     "fma": "FMA3784",
+     "name": "Descending aorta"
+    },
+    {
+     "file": "FJ3464",
+     "fma": "FMA14766",
+     "name": "Left common iliac artery"
+    },
+    {
+     "file": "FJ3466",
+     "fma": "FMA18807",
+     "name": "Left external iliac artery"
+    },
+    {
+     "file": "FJ3476",
+     "fma": "FMA66364",
+     "name": "Trunk of left renal artery"
+    },
+    {
+     "file": "FJ3479",
+     "fma": "FMA4694",
+     "name": "Left subclavian artery"
+    },
+    {
+     "file": "FJ3483",
+     "fma": "FMA4058",
+     "name": "Left common carotid artery"
+    },
+    {
+     "file": "FJ3532",
+     "fma": "FMA14760",
+     "name": "Left testicular artery"
+    },
+    {
+     "file": "FJ3564",
+     "fma": "FMA3941",
+     "name": "Right common carotid artery"
+    },
+    {
+     "file": "FJ3565",
+     "fma": "FMA14765",
+     "name": "Right common iliac artery"
+    },
+    {
+     "file": "FJ3567",
+     "fma": "FMA18806",
+     "name": "Right external iliac artery"
+    },
+    {
+     "file": "FJ3576",
+     "fma": "FMA66363",
+     "name": "Trunk of right renal artery"
+    },
+    {
+     "file": "FJ3579",
+     "fma": "FMA3953",
+     "name": "Right subclavian artery"
+    },
+    {
+     "file": "FJ3617",
+     "fma": "FMA14759",
+     "name": "Right testicular artery"
+    },
+    {
+     "file": "FJ3644",
+     "fma": "FMA66358",
+     "name": "Trunk of superior mesenteric artery"
+    }
+   ]
+  },
+  "veins": {
+   "label": "Veins",
+   "faces": 18000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ1853",
+     "fma": "FMA50735",
+     "name": "Hepatic portal vein"
+    },
+    {
+     "file": "FJ2102",
+     "fma": "FMA21189",
+     "name": "Left femoral vein"
+    },
+    {
+     "file": "FJ2144",
+     "fma": "FMA21188",
+     "name": "Right femoral vein"
+    },
+    {
+     "file": "FJ2414",
+     "fma": "FMA14340",
+     "name": "Middle hepatic vein"
+    },
+    {
+     "file": "FJ2415",
+     "fma": "FMA14339",
+     "name": "Left hepatic vein"
+    },
+    {
+     "file": "FJ2416",
+     "fma": "FMA14338",
+     "name": "Right hepatic vein"
+    },
+    {
+     "file": "FJ3441",
+     "fma": "FMA10951",
+     "name": "Inferior vena cava"
+    },
+    {
+     "file": "FJ3465",
+     "fma": "FMA21388",
+     "name": "Left common iliac vein"
+    },
+    {
+     "file": "FJ3477",
+     "fma": "FMA14336",
+     "name": "Left renal vein"
+    },
+    {
+     "file": "FJ3478",
+     "fma": "FMA14336",
+     "name": "Left renal vein"
+    },
+    {
+     "file": "FJ3480",
+     "fma": "FMA14349",
+     "name": "Left suprarenal vein"
+    },
+    {
+     "file": "FJ3482",
+     "fma": "FMA4761",
+     "name": "Left brachiocephalic vein"
+    },
+    {
+     "file": "FJ3484",
+     "fma": "FMA18886",
+     "name": "Left external iliac vein"
+    },
+    {
+     "file": "FJ3485",
+     "fma": "FMA4762",
+     "name": "Left internal jugular vein"
+    },
+    {
+     "file": "FJ3486",
+     "fma": "FMA4763",
+     "name": "Left subclavian vein"
+    },
+    {
+     "file": "FJ3533",
+     "fma": "FMA14345",
+     "name": "Left testicular vein"
+    },
+    {
+     "file": "FJ3566",
+     "fma": "FMA21387",
+     "name": "Right common iliac vein"
+    },
+    {
+     "file": "FJ3568",
+     "fma": "FMA18885",
+     "name": "Right external iliac vein"
+    },
+    {
+     "file": "FJ3577",
+     "fma": "FMA14335",
+     "name": "Right renal vein"
+    },
+    {
+     "file": "FJ3578",
+     "fma": "FMA14335",
+     "name": "Right renal vein"
+    },
+    {
+     "file": "FJ3580",
+     "fma": "FMA14343",
+     "name": "Right suprarenal vein"
+    },
+    {
+     "file": "FJ3583",
+     "fma": "FMA4751",
+     "name": "Right brachiocephalic vein"
+    },
+    {
+     "file": "FJ3585",
+     "fma": "FMA4754",
+     "name": "Right internal jugular vein"
+    },
+    {
+     "file": "FJ3587",
+     "fma": "FMA4755",
+     "name": "Right subclavian vein"
+    },
+    {
+     "file": "FJ3618",
+     "fma": "FMA14341",
+     "name": "Right testicular vein"
+    },
+    {
+     "file": "FJ3641",
+     "fma": "FMA14331",
+     "name": "Splenic vein"
+    },
+    {
+     "file": "FJ3645",
+     "fma": "FMA4720",
+     "name": "Superior vena cava"
+    },
+    {
+     "file": "FJ3647",
+     "fma": "FMA14332",
+     "name": "Superior mesenteric vein"
+    },
+    {
+     "file": "FJ3659",
+     "fma": "FMA10951",
+     "name": "Inferior vena cava"
+    }
+   ]
+  },
+  "pulmonary_vessels": {
+   "label": "Pulmonary arteries",
+   "faces": 4000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2966",
+     "fma": "FMA8612",
+     "name": "Pulmonary trunk"
+    },
+    {
+     "file": "FJ3019",
+     "fma": "FMA50872",
+     "name": "Right pulmonary artery"
+    },
+    {
+     "file": "FJ2924",
+     "fma": "FMA50873",
+     "name": "Left pulmonary artery"
+    }
+   ]
+  },
+  "spinal_cord": {
+   "label": "Spinal cord",
+   "faces": 6000,
+   "approximate": "BodyParts3D 4.0 has no spinal cord mesh. Drawn as a smooth tube through the centre of the real vertebral canal (found by ray casting each real vertebra), from the real medulla oblongata to the L1/L2 level, with typical adult widths."
+  },
+  "thyroid": {
+   "label": "Thyroid gland",
+   "faces": 3000,
+   "approximate": "BodyParts3D 4.0 has no thyroid gland. Drawn as two lobes joined by an isthmus, at typical adult size (lobes about 5 cm tall), wrapped around the real trachea just below the real cricoid cartilage, where the thyroid sits."
+  },
+  "lung_right": {
+   "label": "Lung (right)",
+   "faces": 7000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2449",
+     "fma": "FMA68215",
+     "name": "Lateral segmental bronchial tree"
+    },
+    {
+     "file": "FJ2451",
+     "fma": "FMA68214",
+     "name": "Medial segmental bronchial tree"
+    },
+    {
+     "file": "FJ2452",
+     "fma": "FMA68321",
+     "name": "Right anterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2453",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2454",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2455",
+     "fma": "FMA68220",
+     "name": "Right lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2456",
+     "fma": "FMA68218",
+     "name": "Right medial basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2457",
+     "fma": "FMA68221",
+     "name": "Right posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2458",
+     "fma": "FMA68213",
+     "name": "Right posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2459",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2470",
+     "fma": "FMA68221",
+     "name": "Right posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2481",
+     "fma": "FMA68221",
+     "name": "Right posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2486",
+     "fma": "FMA68221",
+     "name": "Right posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2487",
+     "fma": "FMA68221",
+     "name": "Right posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2488",
+     "fma": "FMA68218",
+     "name": "Right medial basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2489",
+     "fma": "FMA68221",
+     "name": "Right posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2490",
+     "fma": "FMA68220",
+     "name": "Right lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2491",
+     "fma": "FMA68220",
+     "name": "Right lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2492",
+     "fma": "FMA68220",
+     "name": "Right lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2493",
+     "fma": "FMA68321",
+     "name": "Right anterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2494",
+     "fma": "FMA68321",
+     "name": "Right anterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2495",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2496",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2497",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2498",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2499",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2500",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2501",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2502",
+     "fma": "FMA68216",
+     "name": "Right superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2503",
+     "fma": "FMA68215",
+     "name": "Lateral segmental bronchial tree"
+    },
+    {
+     "file": "FJ2504",
+     "fma": "FMA68215",
+     "name": "Lateral segmental bronchial tree"
+    },
+    {
+     "file": "FJ2505",
+     "fma": "FMA68215",
+     "name": "Lateral segmental bronchial tree"
+    },
+    {
+     "file": "FJ2506",
+     "fma": "FMA68214",
+     "name": "Medial segmental bronchial tree"
+    },
+    {
+     "file": "FJ2507",
+     "fma": "FMA68214",
+     "name": "Medial segmental bronchial tree"
+    },
+    {
+     "file": "FJ2508",
+     "fma": "FMA68214",
+     "name": "Medial segmental bronchial tree"
+    },
+    {
+     "file": "FJ2509",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2510",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2511",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2512",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2513",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2514",
+     "fma": "FMA68212",
+     "name": "Right anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2515",
+     "fma": "FMA68213",
+     "name": "Right posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2516",
+     "fma": "FMA68213",
+     "name": "Right posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2517",
+     "fma": "FMA68213",
+     "name": "Right posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2518",
+     "fma": "FMA68213",
+     "name": "Right posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2519",
+     "fma": "FMA68213",
+     "name": "Right posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2520",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2521",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2522",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2523",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2524",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2525",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2526",
+     "fma": "FMA68211",
+     "name": "Right apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2967",
+     "fma": "FMA68662",
+     "name": "Apical part of right apical segmental artery"
+    },
+    {
+     "file": "FJ2968",
+     "fma": "FMA68670",
+     "name": "Apical part of right posterior segmental artery"
+    },
+    {
+     "file": "FJ2969",
+     "fma": "FMA68670",
+     "name": "Apical part of right posterior segmental artery"
+    },
+    {
+     "file": "FJ2970",
+     "fma": "FMA68673",
+     "name": "Posterior part of right posterior segmental artery"
+    },
+    {
+     "file": "FJ2971",
+     "fma": "FMA68673",
+     "name": "Posterior part of right posterior segmental artery"
+    },
+    {
+     "file": "FJ2972",
+     "fma": "FMA68673",
+     "name": "Posterior part of right posterior segmental artery"
+    },
+    {
+     "file": "FJ2973",
+     "fma": "FMA68197",
+     "name": "Right upper lobar artery"
+    },
+    {
+     "file": "FJ2974",
+     "fma": "FMA68677",
+     "name": "Posterior branch of right anterior segmental artery"
+    },
+    {
+     "file": "FJ2975",
+     "fma": "FMA68683",
+     "name": "Anterior branch of right anterior segmental artery"
+    },
+    {
+     "file": "FJ2976",
+     "fma": "FMA68683",
+     "name": "Anterior branch of right anterior segmental artery"
+    },
+    {
+     "file": "FJ2977",
+     "fma": "FMA68683",
+     "name": "Anterior branch of right anterior segmental artery"
+    },
+    {
+     "file": "FJ2978",
+     "fma": "FMA68665",
+     "name": "Anterior part of right apical segmental artery"
+    },
+    {
+     "file": "FJ2979",
+     "fma": "FMA68683",
+     "name": "Anterior branch of right anterior segmental artery"
+    },
+    {
+     "file": "FJ2980",
+     "fma": "FMA68677",
+     "name": "Posterior branch of right anterior segmental artery"
+    },
+    {
+     "file": "FJ2981",
+     "fma": "FMA68677",
+     "name": "Posterior branch of right anterior segmental artery"
+    },
+    {
+     "file": "FJ2982",
+     "fma": "FMA68691",
+     "name": "Anterior branch of lateral segmental artery"
+    },
+    {
+     "file": "FJ2983",
+     "fma": "FMA68690",
+     "name": "Posterior branch of lateral segmental artery"
+    },
+    {
+     "file": "FJ2984",
+     "fma": "FMA68690",
+     "name": "Posterior branch of lateral segmental artery"
+    },
+    {
+     "file": "FJ2985",
+     "fma": "FMA68691",
+     "name": "Anterior branch of lateral segmental artery"
+    },
+    {
+     "file": "FJ2986",
+     "fma": "FMA68693",
+     "name": "Superior branch of medial segmental artery"
+    },
+    {
+     "file": "FJ2987",
+     "fma": "FMA68694",
+     "name": "Inferior branch of medial segmental artery"
+    },
+    {
+     "file": "FJ2988",
+     "fma": "FMA68694",
+     "name": "Inferior branch of medial segmental artery"
+    },
+    {
+     "file": "FJ2989",
+     "fma": "FMA68665",
+     "name": "Anterior part of right apical segmental artery"
+    },
+    {
+     "file": "FJ2990",
+     "fma": "FMA68693",
+     "name": "Superior branch of medial segmental artery"
+    },
+    {
+     "file": "FJ2991",
+     "fma": "FMA68712",
+     "name": "Lateral branch of right superior segmental artery"
+    },
+    {
+     "file": "FJ2992",
+     "fma": "FMA68712",
+     "name": "Lateral branch of right superior segmental artery"
+    },
+    {
+     "file": "FJ2993",
+     "fma": "FMA68712",
+     "name": "Lateral branch of right superior segmental artery"
+    },
+    {
+     "file": "FJ2994",
+     "fma": "FMA68706",
+     "name": "Medial branch of right superior segmental artery"
+    },
+    {
+     "file": "FJ2995",
+     "fma": "FMA68706",
+     "name": "Medial branch of right superior segmental artery"
+    },
+    {
+     "file": "FJ2996",
+     "fma": "FMA68706",
+     "name": "Medial branch of right superior segmental artery"
+    },
+    {
+     "file": "FJ2997",
+     "fma": "FMA68709",
+     "name": "Superior branch of right superior segmental artery"
+    },
+    {
+     "file": "FJ2998",
+     "fma": "FMA68709",
+     "name": "Superior branch of right superior segmental artery"
+    },
+    {
+     "file": "FJ2999",
+     "fma": "FMA68709",
+     "name": "Superior branch of right superior segmental artery"
+    },
+    {
+     "file": "FJ3000",
+     "fma": "FMA68665",
+     "name": "Anterior part of right apical segmental artery"
+    },
+    {
+     "file": "FJ3001",
+     "fma": "FMA68725",
+     "name": "Lateral branch of right anterior basal segmental artery"
+    },
+    {
+     "file": "FJ3002",
+     "fma": "FMA68723",
+     "name": "Basal branch of right anterior basal segmental artery"
+    },
+    {
+     "file": "FJ3003",
+     "fma": "FMA68723",
+     "name": "Basal branch of right anterior basal segmental artery"
+    },
+    {
+     "file": "FJ3004",
+     "fma": "FMA68728",
+     "name": "Lateral branch of right lateral basal segmental artery"
+    },
+    {
+     "file": "FJ3005",
+     "fma": "FMA68728",
+     "name": "Lateral branch of right lateral basal segmental artery"
+    },
+    {
+     "file": "FJ3006",
+     "fma": "FMA68728",
+     "name": "Lateral branch of right lateral basal segmental artery"
+    },
+    {
+     "file": "FJ3007",
+     "fma": "FMA68728",
+     "name": "Lateral branch of right lateral basal segmental artery"
+    },
+    {
+     "file": "FJ3008",
+     "fma": "FMA68741",
+     "name": "Mediobasal branch of right posterior basal segmental artery"
+    },
+    {
+     "file": "FJ3009",
+     "fma": "FMA68735",
+     "name": "Accessory subsuperior branch of right posterior basal segmental artery"
+    },
+    {
+     "file": "FJ3010",
+     "fma": "FMA68735",
+     "name": "Accessory subsuperior branch of right posterior basal segmental artery"
+    },
+    {
+     "file": "FJ3011",
+     "fma": "FMA68665",
+     "name": "Anterior part of right apical segmental artery"
+    },
+    {
+     "file": "FJ3012",
+     "fma": "FMA68741",
+     "name": "Mediobasal branch of right posterior basal segmental artery"
+    },
+    {
+     "file": "FJ3013",
+     "fma": "FMA68738",
+     "name": "Laterobasal branch of right posterior basal segmental artery"
+    },
+    {
+     "file": "FJ3014",
+     "fma": "FMA68738",
+     "name": "Laterobasal branch of right posterior basal segmental artery"
+    },
+    {
+     "file": "FJ3015",
+     "fma": "FMA68662",
+     "name": "Apical part of right apical segmental artery"
+    },
+    {
+     "file": "FJ3016",
+     "fma": "FMA68662",
+     "name": "Apical part of right apical segmental artery"
+    },
+    {
+     "file": "FJ3017",
+     "fma": "FMA68662",
+     "name": "Apical part of right apical segmental artery"
+    },
+    {
+     "file": "FJ3018",
+     "fma": "FMA68670",
+     "name": "Apical part of right posterior segmental artery"
+    },
+    {
+     "file": "FJ3021",
+     "fma": "FMA68928",
+     "name": "Inferior part of right anterior segmental vein"
+    },
+    {
+     "file": "FJ3022",
+     "fma": "FMA8663",
+     "name": "Right posterior segmental vein"
+    },
+    {
+     "file": "FJ3023",
+     "fma": "FMA8663",
+     "name": "Right posterior segmental vein"
+    },
+    {
+     "file": "FJ3024",
+     "fma": "FMA8663",
+     "name": "Right posterior segmental vein"
+    },
+    {
+     "file": "FJ3025",
+     "fma": "FMA8663",
+     "name": "Right posterior segmental vein"
+    },
+    {
+     "file": "FJ3026",
+     "fma": "FMA8663",
+     "name": "Right posterior segmental vein"
+    },
+    {
+     "file": "FJ3027",
+     "fma": "FMA68926",
+     "name": "Superior part of right anterior segmental vein"
+    },
+    {
+     "file": "FJ3028",
+     "fma": "FMA8662",
+     "name": "Right anterior segmental vein"
+    },
+    {
+     "file": "FJ3029",
+     "fma": "FMA8662",
+     "name": "Right anterior segmental vein"
+    },
+    {
+     "file": "FJ3030",
+     "fma": "FMA68982",
+     "name": "Superior part of medial segmental vein"
+    },
+    {
+     "file": "FJ3031",
+     "fma": "FMA68880",
+     "name": "Trunk of right apical segmental vein"
+    },
+    {
+     "file": "FJ3032",
+     "fma": "FMA68983",
+     "name": "Inferior part of medial segmental vein"
+    },
+    {
+     "file": "FJ3033",
+     "fma": "FMA68983",
+     "name": "Inferior part of medial segmental vein"
+    },
+    {
+     "file": "FJ3034",
+     "fma": "FMA68945",
+     "name": "Anterior part of lateral segmental vein"
+    },
+    {
+     "file": "FJ3035",
+     "fma": "FMA68945",
+     "name": "Anterior part of lateral segmental vein"
+    },
+    {
+     "file": "FJ3036",
+     "fma": "FMA68945",
+     "name": "Anterior part of lateral segmental vein"
+    },
+    {
+     "file": "FJ3037",
+     "fma": "FMA68944",
+     "name": "Posterior part of lateral segmental vein"
+    },
+    {
+     "file": "FJ3038",
+     "fma": "FMA68944",
+     "name": "Posterior part of lateral segmental vein"
+    },
+    {
+     "file": "FJ3039",
+     "fma": "FMA68944",
+     "name": "Posterior part of lateral segmental vein"
+    },
+    {
+     "file": "FJ3041",
+     "fma": "FMA9428",
+     "name": "Right posterior basal segmental vein"
+    },
+    {
+     "file": "FJ3042",
+     "fma": "FMA68921",
+     "name": "Anterior part of right apical segmental vein"
+    },
+    {
+     "file": "FJ3043",
+     "fma": "FMA9428",
+     "name": "Right posterior basal segmental vein"
+    },
+    {
+     "file": "FJ3044",
+     "fma": "FMA9428",
+     "name": "Right posterior basal segmental vein"
+    },
+    {
+     "file": "FJ3045",
+     "fma": "FMA9428",
+     "name": "Right posterior basal segmental vein"
+    },
+    {
+     "file": "FJ3046",
+     "fma": "FMA9428",
+     "name": "Right posterior basal segmental vein"
+    },
+    {
+     "file": "FJ3047",
+     "fma": "FMA9428",
+     "name": "Right posterior basal segmental vein"
+    },
+    {
+     "file": "FJ3048",
+     "fma": "FMA9428",
+     "name": "Right posterior basal segmental vein"
+    },
+    {
+     "file": "FJ3049",
+     "fma": "FMA8673",
+     "name": "Right anterior basal segmental vein"
+    },
+    {
+     "file": "FJ3050",
+     "fma": "FMA8670",
+     "name": "Right superior segmental vein"
+    },
+    {
+     "file": "FJ3051",
+     "fma": "FMA8670",
+     "name": "Right superior segmental vein"
+    },
+    {
+     "file": "FJ3052",
+     "fma": "FMA8670",
+     "name": "Right superior segmental vein"
+    },
+    {
+     "file": "FJ3053",
+     "fma": "FMA68921",
+     "name": "Anterior part of right apical segmental vein"
+    },
+    {
+     "file": "FJ3054",
+     "fma": "FMA9422",
+     "name": "Right medial basal segmental vein"
+    },
+    {
+     "file": "FJ3055",
+     "fma": "FMA9422",
+     "name": "Right medial basal segmental vein"
+    },
+    {
+     "file": "FJ3056",
+     "fma": "FMA8673",
+     "name": "Right anterior basal segmental vein"
+    },
+    {
+     "file": "FJ3057",
+     "fma": "FMA9428",
+     "name": "Right posterior basal segmental vein"
+    },
+    {
+     "file": "FJ3058",
+     "fma": "FMA9428",
+     "name": "Right posterior basal segmental vein"
+    },
+    {
+     "file": "FJ3059",
+     "fma": "FMA9425",
+     "name": "Right lateral basal segmental vein"
+    },
+    {
+     "file": "FJ3060",
+     "fma": "FMA9425",
+     "name": "Right lateral basal segmental vein"
+    },
+    {
+     "file": "FJ3061",
+     "fma": "FMA9425",
+     "name": "Right lateral basal segmental vein"
+    },
+    {
+     "file": "FJ3062",
+     "fma": "FMA9425",
+     "name": "Right lateral basal segmental vein"
+    },
+    {
+     "file": "FJ3063",
+     "fma": "FMA8670",
+     "name": "Right superior segmental vein"
+    },
+    {
+     "file": "FJ3064",
+     "fma": "FMA8681",
+     "name": "Apical part of right apical segmental vein"
+    },
+    {
+     "file": "FJ3065",
+     "fma": "FMA8670",
+     "name": "Right superior segmental vein"
+    },
+    {
+     "file": "FJ3066",
+     "fma": "FMA8670",
+     "name": "Right superior segmental vein"
+    },
+    {
+     "file": "FJ3067",
+     "fma": "FMA8681",
+     "name": "Apical part of right apical segmental vein"
+    },
+    {
+     "file": "FJ3068",
+     "fma": "FMA8681",
+     "name": "Apical part of right apical segmental vein"
+    },
+    {
+     "file": "FJ3069",
+     "fma": "FMA8663",
+     "name": "Right posterior segmental vein"
+    },
+    {
+     "file": "FJ3070",
+     "fma": "FMA8663",
+     "name": "Right posterior segmental vein"
+    }
+   ],
+   "approximate": "BodyParts3D 4.0 models each lung as its real airway (bronchial) tree and blood vessels, without the soft lung tissue. The lung outline here is a smooth envelope wrapped around those real trees."
+  },
+  "lung_left": {
+   "label": "Lung (left)",
+   "faces": 7000,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ2441",
+     "fma": "FMA68227",
+     "name": "Inferior lingular bronchial tree"
+    },
+    {
+     "file": "FJ2442",
+     "fma": "FMA68230",
+     "name": "Left medial basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2443",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2444",
+     "fma": "FMA68223",
+     "name": "Left apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2445",
+     "fma": "FMA68232",
+     "name": "Left lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2446",
+     "fma": "FMA68233",
+     "name": "Left posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2447",
+     "fma": "FMA68225",
+     "name": "Left posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2448",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2460",
+     "fma": "FMA68223",
+     "name": "Left apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2461",
+     "fma": "FMA68223",
+     "name": "Left apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2462",
+     "fma": "FMA68223",
+     "name": "Left apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2463",
+     "fma": "FMA68223",
+     "name": "Left apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2464",
+     "fma": "FMA68223",
+     "name": "Left apical segmental bronchial tree"
+    },
+    {
+     "file": "FJ2465",
+     "fma": "FMA68225",
+     "name": "Left posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2466",
+     "fma": "FMA68225",
+     "name": "Left posterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2467",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2468",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2469",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2471",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2472",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2473",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2474",
+     "fma": "FMA68222",
+     "name": "Left anterior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2475",
+     "fma": "FMA68227",
+     "name": "Inferior lingular bronchial tree"
+    },
+    {
+     "file": "FJ2476",
+     "fma": "FMA68226",
+     "name": "Superior lingular bronchial tree"
+    },
+    {
+     "file": "FJ2477",
+     "fma": "FMA68226",
+     "name": "Superior lingular bronchial tree"
+    },
+    {
+     "file": "FJ2478",
+     "fma": "FMA68226",
+     "name": "Superior lingular bronchial tree"
+    },
+    {
+     "file": "FJ2479",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2480",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2482",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2483",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2484",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2485",
+     "fma": "FMA68228",
+     "name": "Left superior segmental bronchial tree"
+    },
+    {
+     "file": "FJ2527",
+     "fma": "FMA68233",
+     "name": "Left posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2528",
+     "fma": "FMA68233",
+     "name": "Left posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2529",
+     "fma": "FMA68233",
+     "name": "Left posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2530",
+     "fma": "FMA68233",
+     "name": "Left posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2531",
+     "fma": "FMA68233",
+     "name": "Left posterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2532",
+     "fma": "FMA68232",
+     "name": "Left lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2533",
+     "fma": "FMA68232",
+     "name": "Left lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2534",
+     "fma": "FMA68232",
+     "name": "Left lateral basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2535",
+     "fma": "FMA68231",
+     "name": "Left anterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2536",
+     "fma": "FMA68231",
+     "name": "Left anterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2537",
+     "fma": "FMA68230",
+     "name": "Left medial basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2538",
+     "fma": "FMA68231",
+     "name": "Left anterior basal segmental bronchial tree"
+    },
+    {
+     "file": "FJ2540",
+     "fma": "FMA68226",
+     "name": "Superior lingular bronchial tree"
+    },
+    {
+     "file": "FJ2881",
+     "fma": "FMA8647",
+     "name": "Left posterior basal segmental artery"
+    },
+    {
+     "file": "FJ2882",
+     "fma": "FMA8646",
+     "name": "Left lateral basal segmental artery"
+    },
+    {
+     "file": "FJ2883",
+     "fma": "FMA8645",
+     "name": "Left anterior basal segmental artery"
+    },
+    {
+     "file": "FJ2884",
+     "fma": "FMA8644",
+     "name": "Left medial basal segmental artery"
+    },
+    {
+     "file": "FJ2885",
+     "fma": "FMA8644",
+     "name": "Left medial basal segmental artery"
+    },
+    {
+     "file": "FJ2886",
+     "fma": "FMA8645",
+     "name": "Left anterior basal segmental artery"
+    },
+    {
+     "file": "FJ2887",
+     "fma": "FMA8645",
+     "name": "Left anterior basal segmental artery"
+    },
+    {
+     "file": "FJ2888",
+     "fma": "FMA8642",
+     "name": "Left superior segmental artery"
+    },
+    {
+     "file": "FJ2889",
+     "fma": "FMA8642",
+     "name": "Left superior segmental artery"
+    },
+    {
+     "file": "FJ2890",
+     "fma": "FMA8642",
+     "name": "Left superior segmental artery"
+    },
+    {
+     "file": "FJ2891",
+     "fma": "FMA8642",
+     "name": "Left superior segmental artery"
+    },
+    {
+     "file": "FJ2892",
+     "fma": "FMA8647",
+     "name": "Left posterior basal segmental artery"
+    },
+    {
+     "file": "FJ2893",
+     "fma": "FMA8642",
+     "name": "Left superior segmental artery"
+    },
+    {
+     "file": "FJ2894",
+     "fma": "FMA8642",
+     "name": "Left superior segmental artery"
+    },
+    {
+     "file": "FJ2895",
+     "fma": "FMA8642",
+     "name": "Left superior segmental artery"
+    },
+    {
+     "file": "FJ2896",
+     "fma": "FMA8640",
+     "name": "Inferior lingular artery"
+    },
+    {
+     "file": "FJ2897",
+     "fma": "FMA8640",
+     "name": "Inferior lingular artery"
+    },
+    {
+     "file": "FJ2898",
+     "fma": "FMA8639",
+     "name": "Superior lingular artery"
+    },
+    {
+     "file": "FJ2899",
+     "fma": "FMA8639",
+     "name": "Superior lingular artery"
+    },
+    {
+     "file": "FJ2900",
+     "fma": "FMA8639",
+     "name": "Superior lingular artery"
+    },
+    {
+     "file": "FJ2901",
+     "fma": "FMA8639",
+     "name": "Superior lingular artery"
+    },
+    {
+     "file": "FJ2902",
+     "fma": "FMA13279",
+     "name": "Left anterior segmental artery"
+    },
+    {
+     "file": "FJ2903",
+     "fma": "FMA8647",
+     "name": "Left posterior basal segmental artery"
+    },
+    {
+     "file": "FJ2904",
+     "fma": "FMA13279",
+     "name": "Left anterior segmental artery"
+    },
+    {
+     "file": "FJ2905",
+     "fma": "FMA13279",
+     "name": "Left anterior segmental artery"
+    },
+    {
+     "file": "FJ2906",
+     "fma": "FMA13279",
+     "name": "Left anterior segmental artery"
+    },
+    {
+     "file": "FJ2907",
+     "fma": "FMA13279",
+     "name": "Left anterior segmental artery"
+    },
+    {
+     "file": "FJ2908",
+     "fma": "FMA13279",
+     "name": "Left anterior segmental artery"
+    },
+    {
+     "file": "FJ2909",
+     "fma": "FMA13279",
+     "name": "Left anterior segmental artery"
+    },
+    {
+     "file": "FJ2910",
+     "fma": "FMA13279",
+     "name": "Left anterior segmental artery"
+    },
+    {
+     "file": "FJ2911",
+     "fma": "FMA8635",
+     "name": "Left posterior segmental artery"
+    },
+    {
+     "file": "FJ2912",
+     "fma": "FMA8635",
+     "name": "Left posterior segmental artery"
+    },
+    {
+     "file": "FJ2913",
+     "fma": "FMA8635",
+     "name": "Left posterior segmental artery"
+    },
+    {
+     "file": "FJ2914",
+     "fma": "FMA8647",
+     "name": "Left posterior basal segmental artery"
+    },
+    {
+     "file": "FJ2915",
+     "fma": "FMA8634",
+     "name": "Left apical segmental artery"
+    },
+    {
+     "file": "FJ2916",
+     "fma": "FMA8634",
+     "name": "Left apical segmental artery"
+    },
+    {
+     "file": "FJ2917",
+     "fma": "FMA8634",
+     "name": "Left apical segmental artery"
+    },
+    {
+     "file": "FJ2918",
+     "fma": "FMA8634",
+     "name": "Left apical segmental artery"
+    },
+    {
+     "file": "FJ2919",
+     "fma": "FMA8647",
+     "name": "Left posterior basal segmental artery"
+    },
+    {
+     "file": "FJ2920",
+     "fma": "FMA8647",
+     "name": "Left posterior basal segmental artery"
+    },
+    {
+     "file": "FJ2921",
+     "fma": "FMA8646",
+     "name": "Left lateral basal segmental artery"
+    },
+    {
+     "file": "FJ2922",
+     "fma": "FMA8646",
+     "name": "Left lateral basal segmental artery"
+    },
+    {
+     "file": "FJ2923",
+     "fma": "FMA8646",
+     "name": "Left lateral basal segmental artery"
+    },
+    {
+     "file": "FJ2926",
+     "fma": "FMA9438",
+     "name": "Left posterior segmental vein"
+    },
+    {
+     "file": "FJ2927",
+     "fma": "FMA9438",
+     "name": "Left posterior segmental vein"
+    },
+    {
+     "file": "FJ2928",
+     "fma": "FMA9438",
+     "name": "Left posterior segmental vein"
+    },
+    {
+     "file": "FJ2929",
+     "fma": "FMA9438",
+     "name": "Left posterior segmental vein"
+    },
+    {
+     "file": "FJ2930",
+     "fma": "FMA8667",
+     "name": "Left anterior segmental vein"
+    },
+    {
+     "file": "FJ2931",
+     "fma": "FMA8667",
+     "name": "Left anterior segmental vein"
+    },
+    {
+     "file": "FJ2932",
+     "fma": "FMA8667",
+     "name": "Left anterior segmental vein"
+    },
+    {
+     "file": "FJ2934",
+     "fma": "FMA8669",
+     "name": "Inferior lingular vein"
+    },
+    {
+     "file": "FJ2935",
+     "fma": "FMA8669",
+     "name": "Inferior lingular vein"
+    },
+    {
+     "file": "FJ2936",
+     "fma": "FMA9437",
+     "name": "Left apical segmental vein"
+    },
+    {
+     "file": "FJ2937",
+     "fma": "FMA8668",
+     "name": "Superior lingular vein"
+    },
+    {
+     "file": "FJ2938",
+     "fma": "FMA8668",
+     "name": "Superior lingular vein"
+    },
+    {
+     "file": "FJ2939",
+     "fma": "FMA9438",
+     "name": "Left posterior segmental vein"
+    },
+    {
+     "file": "FJ2940",
+     "fma": "FMA9438",
+     "name": "Left posterior segmental vein"
+    },
+    {
+     "file": "FJ2941",
+     "fma": "FMA9438",
+     "name": "Left posterior segmental vein"
+    },
+    {
+     "file": "FJ2942",
+     "fma": "FMA9438",
+     "name": "Left posterior segmental vein"
+    },
+    {
+     "file": "FJ2943",
+     "fma": "FMA9438",
+     "name": "Left posterior segmental vein"
+    },
+    {
+     "file": "FJ2945",
+     "fma": "FMA9451",
+     "name": "Left posterior basal segmental vein"
+    },
+    {
+     "file": "FJ2946",
+     "fma": "FMA9451",
+     "name": "Left posterior basal segmental vein"
+    },
+    {
+     "file": "FJ2947",
+     "fma": "FMA9437",
+     "name": "Left apical segmental vein"
+    },
+    {
+     "file": "FJ2948",
+     "fma": "FMA9451",
+     "name": "Left posterior basal segmental vein"
+    },
+    {
+     "file": "FJ2949",
+     "fma": "FMA9451",
+     "name": "Left posterior basal segmental vein"
+    },
+    {
+     "file": "FJ2951",
+     "fma": "FMA9450",
+     "name": "Left lateral basal segmental vein"
+    },
+    {
+     "file": "FJ2952",
+     "fma": "FMA9450",
+     "name": "Left lateral basal segmental vein"
+    },
+    {
+     "file": "FJ2953",
+     "fma": "FMA9450",
+     "name": "Left lateral basal segmental vein"
+    },
+    {
+     "file": "FJ2954",
+     "fma": "FMA9450",
+     "name": "Left lateral basal segmental vein"
+    },
+    {
+     "file": "FJ2956",
+     "fma": "FMA8678",
+     "name": "Left anterior basal segmental vein"
+    },
+    {
+     "file": "FJ2957",
+     "fma": "FMA8678",
+     "name": "Left anterior basal segmental vein"
+    },
+    {
+     "file": "FJ2958",
+     "fma": "FMA9437",
+     "name": "Left apical segmental vein"
+    },
+    {
+     "file": "FJ2959",
+     "fma": "FMA8678",
+     "name": "Left anterior basal segmental vein"
+    },
+    {
+     "file": "FJ2960",
+     "fma": "FMA8678",
+     "name": "Left anterior basal segmental vein"
+    },
+    {
+     "file": "FJ2961",
+     "fma": "FMA9437",
+     "name": "Left apical segmental vein"
+    },
+    {
+     "file": "FJ2962",
+     "fma": "FMA9437",
+     "name": "Left apical segmental vein"
+    },
+    {
+     "file": "FJ2963",
+     "fma": "FMA9437",
+     "name": "Left apical segmental vein"
+    },
+    {
+     "file": "FJ2964",
+     "fma": "FMA9437",
+     "name": "Left apical segmental vein"
+    },
+    {
+     "file": "FJ2965",
+     "fma": "FMA9438",
+     "name": "Left posterior segmental vein"
+    }
+   ],
+   "approximate": "BodyParts3D 4.0 models each lung as its real airway (bronchial) tree and blood vessels, without the soft lung tissue. The lung outline here is a smooth envelope wrapped around those real trees."
+  },
+  "adrenal_medulla_left": {
+   "label": "Adrenal medulla (left)",
+   "faces": 1200,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3129",
+     "fma": "FMA15630",
+     "name": "Left adrenal gland"
+    }
+   ],
+   "approximate": "BodyParts3D 4.0 models the adrenal gland as one piece. The medulla is shown as the deepest central part of the real gland, about 10% of its volume (in life the medulla is roughly a tenth of the gland). The rest is the cortex."
+  },
+  "adrenal_medulla_right": {
+   "label": "Adrenal medulla (right)",
+   "faces": 1200,
+   "source": "BodyParts3D 4.0",
+   "elements": [
+    {
+     "file": "FJ3130",
+     "fma": "FMA15629",
+     "name": "Right adrenal gland"
+    }
+   ],
+   "approximate": "BodyParts3D 4.0 models the adrenal gland as one piece. The medulla is shown as the deepest central part of the real gland, about 10% of its volume (in life the medulla is roughly a tenth of the gland). The rest is the cortex."
+  }
+ },
+ "diagrammatic_paths": {
+  "arm_left": "Brachial plexus and median nerve: from the cervical spinal cord (C6), behind the real clavicle, through the armpit beside the real axillary artery, down the arm beside the real brachial artery to the hand.",
+  "biceps_left": "Musculocutaneous nerve to the biceps (diagrammatic).",
+  "leg_left": "Sacral plexus and sciatic/tibial nerve: from the lower spinal nerves, in front of the real sacrum, out through the real greater sciatic notch, down behind the real femur and tibia to the sole of the foot.",
+  "femoral_left": "Femoral nerve: from the lumbar spinal nerves, through the real psoas muscle, next to the real femoral artery into the quadriceps (diagrammatic).",
+  "intercostal_T4_left": "Intercostal nerve T4: follows the lower edge of the real rib (diagrammatic).",
+  "intercostal_T6_left": "Intercostal nerve T6: follows the lower edge of the real rib (diagrammatic).",
+  "intercostal_T8_left": "Intercostal nerve T8: follows the lower edge of the real rib (diagrammatic).",
+  "symtrunk_left": "Sympathetic trunk: a chain of ganglia running beside the real vertebrae from the neck to the coccyx (diagrammatic position).",
+  "ramus_T1_left": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "ramus_T3_left": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "ramus_T5_left": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "ramus_T7_left": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "ramus_T9_left": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "ramus_T11_left": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "ramus_L1_left": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "arm_right": "Brachial plexus and median nerve: from the cervical spinal cord (C6), behind the real clavicle, through the armpit beside the real axillary artery, down the arm beside the real brachial artery to the hand.",
+  "biceps_right": "Musculocutaneous nerve to the biceps (diagrammatic).",
+  "leg_right": "Sacral plexus and sciatic/tibial nerve: from the lower spinal nerves, in front of the real sacrum, out through the real greater sciatic notch, down behind the real femur and tibia to the sole of the foot.",
+  "femoral_right": "Femoral nerve: from the lumbar spinal nerves, through the real psoas muscle, next to the real femoral artery into the quadriceps (diagrammatic).",
+  "intercostal_T4_right": "Intercostal nerve T4: follows the lower edge of the real rib (diagrammatic).",
+  "intercostal_T6_right": "Intercostal nerve T6: follows the lower edge of the real rib (diagrammatic).",
+  "intercostal_T8_right": "Intercostal nerve T8: follows the lower edge of the real rib (diagrammatic).",
+  "symtrunk_right": "Sympathetic trunk: a chain of ganglia running beside the real vertebrae from the neck to the coccyx (diagrammatic position).",
+  "ramus_T1_right": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "ramus_T3_right": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "ramus_T5_right": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "ramus_T7_right": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "ramus_T9_right": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "ramus_T11_right": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "ramus_L1_right": "Sympathetic nerve fibres leave the middle (thoracic and upper lumbar) spinal cord and join the trunk (diagrammatic).",
+  "sym_eye_left": "Sympathetic fibres to the eye: from the top ganglion of the trunk, along the real internal carotid artery (diagrammatic).",
+  "sym_salivary_left": "Sympathetic fibres to the salivary glands (diagrammatic).",
+  "sym_heart_left": "Cardiac nerves from the neck ganglia to the heart (diagrammatic).",
+  "sym_lung_left": "Sympathetic fibres to the lung (diagrammatic).",
+  "splanchnic_left": "Greater splanchnic nerve: from the thoracic trunk down to the coeliac ganglion beside the real coeliac trunk (diagrammatic).",
+  "sym_adrenal_left": "Splanchnic fibres to the adrenal medulla (they reach it directly, without a relay) (diagrammatic).",
+  "sym_bladder_left": "Sympathetic fibres to the bladder via the hypogastric nerves (diagrammatic).",
+  "vagus_left": "Vagus nerve: from the real medulla oblongata, down the neck between the real carotid artery and jugular vein, behind the real lung root, along the real oesophagus to the stomach (diagrammatic).",
+  "vagus_heart_left": "Cardiac branches of the vagus (diagrammatic).",
+  "vagus_lung_left": "Pulmonary branches of the vagus (diagrammatic).",
+  "para_eye_left": "Oculomotor nerve (cranial nerve III) to the real ciliary ganglion and the eye (diagrammatic up to the ganglion).",
+  "para_salivary_left": "Facial nerve (chorda tympani) fibres to the submandibular and sublingual glands (diagrammatic).",
+  "pelvic_left": "Pelvic splanchnic nerves: parasympathetic fibres from the lowest part of the spinal cord, leaving through the real sacrum to the bladder (diagrammatic).",
+  "sym_eye_right": "Sympathetic fibres to the eye: from the top ganglion of the trunk, along the real internal carotid artery (diagrammatic).",
+  "sym_salivary_right": "Sympathetic fibres to the salivary glands (diagrammatic).",
+  "sym_heart_right": "Cardiac nerves from the neck ganglia to the heart (diagrammatic).",
+  "sym_lung_right": "Sympathetic fibres to the lung (diagrammatic).",
+  "splanchnic_right": "Greater splanchnic nerve: from the thoracic trunk down to the coeliac ganglion beside the real coeliac trunk (diagrammatic).",
+  "sym_adrenal_right": "Splanchnic fibres to the adrenal medulla (they reach it directly, without a relay) (diagrammatic).",
+  "sym_bladder_right": "Sympathetic fibres to the bladder via the hypogastric nerves (diagrammatic).",
+  "vagus_right": "Vagus nerve: from the real medulla oblongata, down the neck between the real carotid artery and jugular vein, behind the real lung root, along the real oesophagus to the stomach (diagrammatic).",
+  "vagus_heart_right": "Cardiac branches of the vagus (diagrammatic).",
+  "vagus_lung_right": "Pulmonary branches of the vagus (diagrammatic).",
+  "para_eye_right": "Oculomotor nerve (cranial nerve III) to the real ciliary ganglion and the eye (diagrammatic up to the ganglion).",
+  "para_salivary_right": "Facial nerve (chorda tympani) fibres to the submandibular and sublingual glands (diagrammatic).",
+  "pelvic_right": "Pelvic splanchnic nerves: parasympathetic fibres from the lowest part of the spinal cord, leaving through the real sacrum to the bladder (diagrammatic).",
+  "vagus_liver": "Hepatic branch of the vagus (diagrammatic).",
+  "vagus_gut": "Vagal fibres to the intestines, via the coeliac plexus and along the real superior mesenteric artery (diagrammatic).",
+  "sym_gut": "Sympathetic fibres from the coeliac ganglion to the intestines (diagrammatic).",
+  "sym_stomach": "Sympathetic fibres to the stomach (diagrammatic).",
+  "sym_liver": "Sympathetic fibres to the liver (diagrammatic).",
+  "cauda_0": "Cauda equina: spinal nerve roots below the end of the spinal cord (diagrammatic).",
+  "cauda_1": "Cauda equina: spinal nerve roots below the end of the spinal cord (diagrammatic).",
+  "cauda_2": "Cauda equina: spinal nerve roots below the end of the spinal cord (diagrammatic).",
+  "cauda_3": "Cauda equina: spinal nerve roots below the end of the spinal cord (diagrammatic)."
+ },
+ "animation_routes": "Signal and blood routes for the animations follow these nerve paths and the centre lines of the real BodyParts3D vessels (found by 3D skeletonisation). Straight links join vessels where BodyParts3D has no mesh (for example the venous sinuses of the skull, the small thyroid veins and the lung capillaries)."
+}

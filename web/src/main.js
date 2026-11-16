@@ -19,6 +19,7 @@ const routes = {
 };
 
 let cleanup = null;
+let routeToken = 0;
 const main = document.getElementById('main');
 
 async function route() {
@@ -31,8 +32,12 @@ async function route() {
     if (target === name || (target === 'learn' && name === 'lesson')) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
   main.innerHTML = '';
+  const token = ++routeToken;
   const mod = await load();
-  cleanup = (await mod.render(main, rest)) || null;
+  if (token !== routeToken) return;              // the learner moved on while this page was loading
+  const done = (await mod.render(main, rest)) || null;
+  if (token !== routeToken) { try { done?.(); } catch (e) { console.error(e); } return; } // stale page: tidy up its 3D
+  cleanup = done;
   window.scrollTo(0, 0);
   main.focus({ preventScroll: true });
 }

@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "models": "gltf-transform meshopt ../tools/brain_raw.glb public/models/brain.glb --level medium",
+    "body": "gltf-transform meshopt ../tools/body_raw.glb public/models/body.glb --level medium",
     "mediapipe": "node scripts/copy-mediapipe.mjs"
   },
   "dependencies": {

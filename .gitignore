@@ -7,3 +7,4 @@ __pycache__/
 tools/data/
 web/public/mediapipe/
 .claude/
+tools/body_raw.glb

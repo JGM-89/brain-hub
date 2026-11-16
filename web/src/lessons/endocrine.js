@@ -1,177 +1,208 @@
 // The endocrine system — AQA 7182 4.2.1: "The function of the endocrine system: glands and hormones."
-// Visual: a front-view body (head to hips) on a dark stage. Each step lights one gland and sends
-// its hormone through the blood vessels to its targets. Zoomed insets show receptors, the
-// hypothalamus–pituitary link and the two layers of the adrenal gland. The last step compares
-// the nervous and endocrine systems side by side.
-import {
-  svg, defs, routePaths, light, watchScale, createLabels, createAnimator,
-  injectBodyCSS, injectCSS, playAgainButton, uid, svgEl,
-} from './shared/body.js';
+// Visual: a real 3D human body (BodyParts3D, CC BY 4.0). Each step lights one gland and sends its
+// hormone through the real blood vessels: from the gland into a vein, through the heart and lungs,
+// then out along the arteries to its target organs. A zoomed-in inset shows the hypothalamus and
+// pituitary, and a cut-away of the real adrenal gland shows the cortex and medulla. The model is male,
+// so there are no ovaries: this is said on screen. The thyroid, the adrenal medulla and the spinal cord
+// are approximate (BodyParts3D has no mesh for them); see src/data/body-provenance.json.
+import { bodyStage, C } from '../three/body3d.js';
+import { reducedMotion } from '../settings.js';
 
-// body space -> stage space
-const S = 1.45, TX = 226, TY = 14;
-const O = (x, y) => [+(TX + S * x).toFixed(1), +(TY + S * y).toFixed(1)];
-const VB = { x: 0, y: 0, w: 800, h: 600 };
+const KIDNEY = '#C3A6EE', LIVER = '#E0A07A', MEDULLA = '#FF8A5C';
+const OVARY_NOTE = 'In females they are in the pelvis (the lower tummy), one on each side of the womb.';
 
-// Small "target cells" where hormones arrive (body space)
-const TARGETS = { armL: [40, 300], armR: [200, 300], legL: [102, 372], legR: [138, 372], headL: [113, 52], headR: [127, 52] };
+const L = {
+  pituitary: { at: 'pituitary', side: 'left', text: 'Pituitary gland', color: C.gland },
+  thyroid: { at: 'thyroid', side: 'left', text: 'Thyroid gland', sub: 'drawn at a typical size', color: C.gland },
+  adrenals: { at: 'adrenal_right', side: 'left', text: 'Adrenal glands', color: C.gland },
+  ovaries: { at: 'ovary_position_right', side: 'left', text: 'Ovaries (in females)', sub: 'not in this male model', short: 'Ovaries (females): not in this model', note: true, color: C.gland },
+  pineal: { minor: true, at: 'pineal', side: 'right', text: 'Pineal gland', sub: 'extra: not on the spec', color: C.gland },
+  pancreas: { at: 'pancreas', side: 'right', text: 'Pancreas', color: C.gland },
+  testes: { at: 'testis_left', side: 'right', text: 'Testes', sub: '(in males)', color: C.gland },
+};
+const ALL_GLANDS = ['pituitary', 'thyroid', 'adrenals', 'pancreas', 'testes', 'pineal'];
+const VESSELS = { arteries: { color: C.blood, alpha: 0.35, glow: 0.05, tint: 0.6 }, veins: { color: C.vein, alpha: 0.3, glow: 0.05, tint: 0.6 } };
+const TORSO = { parts: ['skull', 'pelvis', 'testes'], dir: [0, 0.05, 1] };
 
-const GLAND_LABELS = [
-  { at: O(120, 47.8), side: 'left', y: 70, text: 'Pituitary gland', color: 'var(--c-gland)' },
-  { at: O(116, 91), side: 'left', y: 140, text: 'Thyroid gland', color: 'var(--c-gland)' },
-  { at: O(93, 224), side: 'left', y: 320, text: 'Adrenal glands', color: 'var(--c-gland)' },
-  { at: O(101, 296), side: 'left', y: 430, text: 'Ovaries', sub: '(in females)', color: 'var(--c-gland)' },
-  { at: O(121, 34), side: 'right', y: 40, text: 'Pineal gland', sub: 'extra: not on\nthe spec', color: 'var(--c-gland)' },
-  { at: O(138, 236), side: 'right', y: 340, text: 'Pancreas', color: 'var(--c-gland)' },
-  { at: O(128, 334), side: 'right', y: 480, text: 'Testes', sub: '(in males)', color: 'var(--c-gland)' },
-];
-const ALL_GLANDS = ['pituitary', 'thyroid', 'adrenals', 'pancreas', 'ovaries', 'testes', 'pineal'];
+// A hormone's journey: gland -> vein(s) -> heart and lungs -> artery to a target
+function journey(v, venous, targets, { color = C.hormone, speed = 330, count = 2, stagger = 0.35 } = {}) {
+  return Promise.all(targets.map((t, i) => v.flow([...[].concat(venous), 'heart_lungs', t], { color, speed, count, spacing: 0.45, delay: i * stagger, size: 9 })));
+}
 
 const STEPS = [
   { // 0 glands and hormones
-    on: [...ALL_GLANDS, 'vessels'], caption: 'Each gland releases hormones into the blood',
-    labels: [...GLAND_LABELS, { at: O(185, 178), side: 'right', y: 220, text: 'Blood vessels', color: 'var(--c-blood)' }],
+    caption: 'Each gland releases hormones into the blood',
+    spec: { lit: { ...Object.fromEntries(ALL_GLANDS.map((g) => [g, C.gland])), ...VESSELS } },
+    frame: TORSO,
+    labels: [L.pituitary, L.thyroid, L.adrenals, L.ovaries, L.pineal, L.pancreas, L.testes],
+    async play(v) {
+      v.flow(['v_thyroid', 'heart_lungs', 'a_arm_right'], { speed: 330, count: 2 });
+      v.flow(['v_adrenal_left', 'heart_lungs', 'a_leg_left'], { speed: 330, count: 2, delay: 0.5 });
+      v.flow(['v_pituitary', 'heart_lungs', 'a_head_left'], { speed: 330, count: 2, delay: 1 });
+      v.flow(['v_testis_right', 'heart_lungs', 'a_leg_right'], { speed: 330, count: 2, delay: 1.5 });
+      await v.flow(['v_pancreas_liver'], { speed: 200, count: 2, delay: 0.8 });
+    },
   },
   { // 1 target cells
-    on: ['vessels'], inset: 'receptor', caption: 'Zoomed in: a hormone fits the receptor on its target cell',
-    labels: [],
+    caption: 'Hormones reach every part of the body in the blood, but only target cells respond',
+    spec: { lit: { ...VESSELS, adrenal_right: C.gland } },
+    frame: TORSO,
+    receptor: true,
+    labels: [{ at: 'aortic_arch', side: 'left', text: 'Hormones in the blood', sub: 'carried everywhere', color: C.hormone }],
+    async play(v) { await journey(v, 'v_adrenal_right', ['a_head_right', 'a_arm_left', 'a_kidney_left', 'a_leg_right', 'a_gut']); },
   },
   { // 2 master gland
-    on: ['pituitary', 'hypothalamus', 'brain', 'thyroid', 'adrenals', 'ovaries', 'testes', 'vessels'], inset: 'pituitary',
     caption: 'The pituitary sends hormones in the blood to other glands',
+    spec: { lit: { hypothalamus: C.brainpart, pituitary: C.gland, thyroid: C.gland, adrenals: C.gland, testes: C.gland, ...VESSELS } },
+    frame: TORSO,
+    inset: { at: { at: 'pituitary', offset: [0, 8, 0] }, dist: 95, dir: [1, 0.1, 0.3], tag: 'Zoomed in: base of the brain', only: ['hypothalamus', 'pituitary', 'optic_nerves', 'brainstem', 'thalamus'] },
     labels: [
-      { at: O(122, 91), side: 'right', y: 140, text: 'Thyroid gland', color: 'var(--c-gland)' },
-      { at: O(148, 220.5), side: 'right', y: 290, text: 'Adrenal glands', color: 'var(--c-gland)' },
-      { at: O(139, 296), side: 'right', y: 400, text: 'Ovaries', sub: '(in females)', color: 'var(--c-gland)' },
-      { at: O(128, 334), side: 'right', y: 480, text: 'Testes', sub: '(in males)', color: 'var(--c-gland)' },
+      { at: 'hypothalamus', view: 'inset', side: 'left', text: 'Hypothalamus', sub: 'part of the brain', color: C.brainpart },
+      { at: 'pituitary', view: 'inset', side: 'right', text: 'Pituitary gland', sub: 'the “master gland”', color: C.gland },
+      { ...L.thyroid, side: 'left' }, { ...L.adrenals, side: 'left' }, { ...L.testes, side: 'right' }, { ...L.ovaries, side: 'left' },
     ],
+    async play(v, tok) {
+      await v.flow('hypo_pit', { color: C.brainpart, speed: 14, size: 2.2, count: 3, spacing: 0.5, fixed: true });
+      if (!v.alive(tok)) return;
+      await journey(v, 'v_pituitary', ['a_thyroid_left', 'a_adrenal_left', 'a_adrenal_right', 'a_testis_left', 'a_testis_right'], { color: C.gland });
+    },
   },
   { // 3 thyroid
-    on: ['thyroid', 'vessels', 'targets', 'heart'], caption: 'Thyroxine travels to cells all over the body',
+    caption: 'Thyroxine travels to cells all over the body',
+    spec: { lit: { thyroid: C.gland, heart: C.heart, muscles: { color: C.hormone, alpha: 0.75, glow: 0.15 }, ...VESSELS } },
+    frame: TORSO,
     labels: [
-      { at: O(114, 91), side: 'left', y: 130, text: 'Thyroid gland', sub: 'releases thyroxine', short: 'Thyroid:\nthyroxine', color: 'var(--c-gland)' },
-      { at: O(131, 170), side: 'right', y: 230, text: 'Heart', sub: 'heart rate\nincreases', color: 'var(--c-heart)' },
-      { at: O(200, 300), side: 'right', y: 420, text: 'Cells all over\nthe body', sub: 'metabolism\nspeeds up', short: 'Body cells', color: 'var(--c-hormone)' },
+      { at: 'thyroid', side: 'left', text: 'Thyroid gland', sub: 'releases thyroxine (drawn at a typical size)', short: 'Thyroid: thyroxine', color: C.gland },
+      { at: 'heart', side: 'right', text: 'Heart', sub: 'heart rate increases', color: C.heart },
+      { at: 'muscle_thigh_left', side: 'right', text: 'Cells all over the body', sub: 'metabolism speeds up', short: 'Body cells', color: C.hormone },
     ],
+    async play(v, tok) {
+      await journey(v, 'v_thyroid', ['a_heart', 'a_arm_left', 'a_arm_right', 'a_thigh_left', 'a_thigh_right', 'a_head_right'], { stagger: 0.25 });
+      if (v.alive(tok)) v.rhythm('heart', { rate: 85, amp: 0.03, duration: 8 });
+    },
   },
   { // 4 adrenal glands
-    on: ['adrenals', 'kidneys', 'vessels'], inset: 'adrenal', caption: 'Each adrenal gland has two parts, which release different hormones',
+    caption: 'Each adrenal gland has two parts, which release different hormones',
+    note: 'Cut-away: the medulla is shown as the central core of the real gland (its exact edge is approximate)',
+    spec: { lit: { adrenals: C.gland, medullas: { color: MEDULLA, glow: 0.45, tint: 0.6 }, kidneys: { color: KIDNEY, alpha: 0.85, glow: 0.05 }, veins: VESSELS.veins } },
+    frame: { parts: ['kidney_left', 'kidney_right', 'adrenal_left', 'adrenal_right'], dir: [0, 0.12, 1], pad: 1.5 },
+    inset: { at: 'adrenal_left', dist: 105, dir: [0.25, 0.25, 1], tag: 'Zoomed in: cut through an adrenal gland',
+      only: ['adrenal_left', 'adrenal_medulla_left'],
+  clip: { parts: ['adrenal_left', 'adrenal_medulla_left'], normal: [-0.25, -0.25, -1], capColors: { adrenal_left: '#D9A23E', adrenal_medulla_left: '#C04E22' } } },
     labels: [
-      { at: O(93, 224), side: 'left', y: 300, text: 'Adrenal glands', sub: 'on top of the\nkidneys', color: 'var(--c-gland)' },
-      { at: O(93, 244), side: 'left', y: 400, text: 'Kidney', color: 'var(--c-kidney)' },
+      { at: 'adrenal_right', side: 'left', text: 'Adrenal glands', sub: 'on top of the kidneys', color: C.gland },
+      { at: 'kidney_right', side: 'left', text: 'Kidney', color: KIDNEY },
+      { at: { at: 'adrenal_left', offset: [12, 14, 0] }, view: 'inset', side: 'right', y: 0.6, text: 'Adrenal cortex', sub: 'outer layer → cortisol', short: 'Cortex: cortisol', color: C.gland },
+      { at: 'adrenal_medulla_left', view: 'inset', side: 'right', y: 0.8, text: 'Adrenal medulla', sub: 'middle → adrenaline', short: 'Medulla: adrenaline', color: MEDULLA },
     ],
+    async play(v) {
+      v.flow('v_adrenal_right', { color: C.hormone, speed: 120, count: 4, spacing: 0.6 });
+      await v.flow('v_adrenal_left', { color: C.hormone, speed: 120, count: 4, spacing: 0.6 });
+    },
   },
   { // 5 pancreas
-    on: ['pancreas', 'liver', 'vessels', 'targets'], caption: 'Insulin helps cells take in glucose from the blood',
+    caption: 'Insulin helps cells take in glucose from the blood',
+    spec: { lit: { pancreas: C.gland, liver: LIVER, thigh_muscles: { color: C.muscle, alpha: 0.85, glow: 0.15 }, ...VESSELS } },
+    frame: { parts: ['ribcage', 'muscle_thigh_left', 'muscle_thigh_right'], dir: [0, 0.05, 1] },
     labels: [
-      { at: O(139, 236), side: 'right', y: 320, text: 'Pancreas', sub: 'releases insulin', short: 'Pancreas:\ninsulin', color: 'var(--c-gland)' },
-      { at: O(95, 205), side: 'left', y: 270, text: 'Liver', sub: 'takes in glucose', color: 'var(--c-liver)' },
-      { at: O(102, 372), side: 'left', y: 470, text: 'Muscle cells', sub: 'take in glucose', color: 'var(--c-hormone)' },
+      { at: 'pancreas', side: 'right', text: 'Pancreas', sub: 'releases insulin', short: 'Pancreas: insulin', color: C.gland },
+      { at: 'liver', side: 'left', text: 'Liver', sub: 'takes in glucose', color: LIVER },
+      { at: 'muscle_thigh_right', side: 'left', text: 'Muscle cells', sub: 'take in glucose', color: C.muscle },
     ],
+    async play(v, tok) {
+      await v.flow('v_pancreas_liver', { speed: 160, count: 3, spacing: 0.5 });
+      if (!v.alive(tok)) return;
+      await Promise.all(['a_thigh_left', 'a_thigh_right'].map((t, i) => v.flow(['v_liver', 'heart_lungs', t], { speed: 330, count: 2, spacing: 0.45, delay: i * 0.4 })));
+    },
   },
   { // 6 ovaries and testes
-    on: ['ovaries', 'testes', 'vessels', 'targets'], caption: 'Ovaries release oestrogen. Testes release testosterone.',
+    caption: 'Ovaries release oestrogen. Testes release testosterone.',
+    note: 'This 3D model is of a male body, so it has testes but no ovaries',
+    spec: { lit: { testes: C.gland, muscles: { color: C.hormone, alpha: 0.7, glow: 0.12 }, ...VESSELS } },
+    frame: { parts: ['ribcage', 'pelvis', 'testes', 'muscle_thigh_left'], dir: [0, 0.05, 1] },
     labels: [
-      { at: O(101, 296), side: 'left', y: 400, text: 'Ovaries', sub: '(in females)\nrelease oestrogen', short: 'Ovaries:\noestrogen', color: 'var(--c-gland)' },
-      { at: O(128, 334), side: 'right', y: 440, text: 'Testes', sub: '(in males) release\ntestosterone', short: 'Testes:\ntestosterone', color: 'var(--c-gland)' },
+      { at: 'ovary_position_right', side: 'left', text: 'Ovaries (in females)', sub: `release oestrogen. Not in this male model. ${OVARY_NOTE}`, short: 'Ovaries (females): not in this model', note: true, color: C.gland },
+      { at: 'testis_left', side: 'right', text: 'Testes (in males)', sub: 'release testosterone', short: 'Testes: testosterone', color: C.gland },
     ],
+    async play(v) {
+      await Promise.all([
+        journey(v, 'v_testis_left', ['a_arm_left', 'a_thigh_left', 'a_head_left']),
+        journey(v, 'v_testis_right', ['a_arm_right', 'a_thigh_right'], { stagger: 0.5 }),
+      ]);
+    },
   },
-  { compare: true, caption: 'Two ways of sending messages around the body' }, // 7
+  { // 7 compare
+    caption: 'Two ways of sending messages around the body',
+    compare: true,
+    spec: { lit: { arm_right: C.pns, spinal_cord: { color: C.cns, glow: 0.2 }, ...VESSELS, adrenal_right: C.gland } },
+    frame: { parts: ['skull', 'muscle_arm_right', 'adrenal_right', 'hand_right'], dir: [-0.15, 0.05, 1] },
+    labels: [
+      { at: { at: 'arm_right', offset: [0, 80, 0] }, side: 'left', text: 'Nervous system', sub: 'electrical impulses: very fast', color: C.pns },
+      { at: 'aortic_arch', side: 'right', text: 'Endocrine system', sub: 'hormone in the blood: slower', color: C.hormone },
+    ],
+    async play(v, tok) {
+      const lit = (on) => v.setState({ ...STEPS[7].spec, lit: { ...STEPS[7].spec.lit, ...(on.nerve ? { muscle_arm_right: C.pns } : {}), ...(on.hormone ? { muscle_arm_left: C.hormone, thigh_muscles: C.hormone } : {}) } });
+      const state = { nerve: false, hormone: false };
+      const hormone = journey(v, 'v_adrenal_right', ['a_biceps_left', 'a_thigh_left', 'a_thigh_right'], { speed: 260, count: 2 })
+        .then((ok) => { if (ok.every(Boolean) && v.alive(tok)) { state.hormone = true; lit(state); } });
+      for (let i = 0; i < 3; i++) {
+        await v.flow('motor_arm_right', { color: C.pns, speed: 1800, size: 11, track: i === 0 });
+        if (!v.alive(tok)) return;
+        state.nerve = true; lit(state);
+        await v.wait(0.45);
+        state.nerve = false; lit(state);
+        if (!(await v.wait(0.9))) return;
+      }
+      await hormone;
+    },
+  },
+];
+
+const RECAP_LABELS = [
+  { ...L.pituitary, sub: 'controls other glands' }, { ...L.thyroid, sub: 'thyroxine' }, { ...L.adrenals, sub: 'adrenaline (medulla), cortisol (cortex)' },
+  { ...L.ovaries, sub: 'oestrogen (not in this male model)', short: 'Ovaries (females): not in this model' }, { ...L.pancreas, sub: 'insulin' }, { ...L.testes, sub: 'testosterone' },
 ];
 
 const CSS = `
-.en-vis .en-inset { opacity:0; transition: opacity .5s ease; pointer-events:none; }
-.en-vis .en-inset.show { opacity:1; }
-.en-vis .en-inset-bg { fill: color-mix(in srgb, var(--bh-bg) 92%, #fff 8%); }
-.en-vis .en-inset-ring { fill:none; stroke: color-mix(in srgb, var(--bh-ink) 40%, transparent); stroke-width: 2; }
-.en-vis .en-connector { fill:none; stroke: color-mix(in srgb, var(--bh-ink) 40%, transparent); stroke-width: 1.5; stroke-dasharray: 4 5; }
-.en-vis .en-zoomring { fill:none; stroke: color-mix(in srgb, var(--bh-ink) 55%, transparent); stroke-width: 1.5; }
-.en-vis .en-tube { fill: color-mix(in srgb, var(--c-blood) 22%, transparent); stroke: color-mix(in srgb, var(--c-blood) 70%, transparent); stroke-width: 2; }
-.en-vis .en-cell { fill: color-mix(in srgb, var(--bh-ink) 8%, transparent); stroke: color-mix(in srgb, var(--bh-ink) 45%, transparent); stroke-width: 2; transition: fill .6s, stroke .6s; }
-.en-vis .en-cell.responds { fill: color-mix(in srgb, var(--c-hormone) 30%, transparent); stroke: var(--c-hormone); }
-.en-vis .en-nucleus { fill: color-mix(in srgb, var(--bh-ink) 16%, transparent); }
-.en-vis .en-rec { fill:none; stroke: color-mix(in srgb, var(--bh-ink) 80%, transparent); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
-.en-vis .en-hormone { fill: var(--c-hormone); stroke: var(--bh-bg); stroke-width: 1; }
-.en-vis .en-docked { opacity: 0; transition: opacity .4s; }
-.en-vis .en-docked.on { opacity: 1; }
-.en-vis .en-brainmass { fill: color-mix(in srgb, var(--c-cns) 14%, transparent); stroke: color-mix(in srgb, var(--c-cns) 60%, transparent); stroke-width: 2; }
-.en-vis .en-gyri { fill:none; stroke: color-mix(in srgb, var(--c-cns) 45%, transparent); stroke-width: 2.5; stroke-linecap: round; }
-.en-vis .en-hypo { fill: color-mix(in srgb, var(--c-brainpart) 45%, transparent); stroke: var(--c-brainpart); stroke-width: 2; }
-.en-vis .en-pit { fill: color-mix(in srgb, var(--c-gland) 55%, transparent); stroke: var(--c-gland); stroke-width: 2; }
-.en-vis .en-stalk { fill:none; stroke: var(--c-gland); stroke-width: 7; stroke-linecap: round; opacity:.7; }
-.en-vis .en-bone { fill:none; stroke: color-mix(in srgb, var(--bh-ink) 35%, transparent); stroke-width: 5; stroke-linecap: round; }
-.en-vis .en-cortex { fill: color-mix(in srgb, var(--c-gland) 40%, transparent); stroke: var(--c-gland); stroke-width: 2; }
-.en-vis .en-medulla { fill: color-mix(in srgb, var(--c-sym) 55%, transparent); stroke: var(--c-sym); stroke-width: 2; }
-.en-vis .en-kidney { fill: color-mix(in srgb, var(--c-kidney) 22%, transparent); stroke: color-mix(in srgb, var(--c-kidney) 70%, transparent); stroke-width: 2; }
-.en-vis .bh-target { fill: color-mix(in srgb, var(--c-hormone) 15%, transparent); stroke: color-mix(in srgb, var(--c-hormone) 60%, transparent); stroke-width: .8; transition: fill .5s; }
-.en-vis .bh-target.hit { fill: var(--c-hormone); }
-.en-vis .en-svgwrap { flex:1 1 auto; min-height:0; display:flex; }
-.en-vis .en-compare { flex:1 1 auto; min-height:0; overflow:auto; padding: 14px 16px 4px; display:grid; gap: 12px; align-content:start; }
-.en-vis .en-lanes { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.en-vis .en-lane { background: var(--bh-panel); border: 1px solid rgb(255 255 255 / 14%); border-radius: 14px; padding: 10px 12px; }
-.en-vis .en-lane h3 { margin: 0 0 2px; font-size: 1rem; color: var(--bh-ink); }
-.en-vis .en-lane p { margin: 4px 0 0; font-size: .85rem; color: var(--bh-soft); }
-.en-vis .en-lane svg { width: 100%; height: auto; display:block; }
-.en-vis table { width:100%; border-collapse: collapse; font-size: .85rem; color: var(--bh-ink); }
-.en-vis th, .en-vis td { text-align:left; vertical-align: top; padding: 7px 8px; border-bottom: 1px solid rgb(255 255 255 / 14%); }
-.en-vis thead th { font-size: .85rem; color: var(--bh-soft); }
-.en-vis tbody th { font-weight: 700; color: var(--bh-soft); width: 26%; }
-.en-vis .lane-nerve { fill:none; stroke: var(--c-pns); stroke-width: 4; stroke-linecap: round; }
-.en-vis .lane-myelin { fill: color-mix(in srgb, var(--c-pns) 35%, var(--bh-bg)); stroke: var(--c-pns); stroke-width: 1.5; }
-.en-vis .lane-soma { fill: color-mix(in srgb, var(--c-pns) 30%, var(--bh-bg)); stroke: var(--c-pns); stroke-width: 2; }
-.en-vis .lane-vessel { fill:none; stroke: var(--c-blood); stroke-width: 9; stroke-linecap: round; opacity:.45; }
-.en-vis .lane-gland { fill: color-mix(in srgb, var(--c-gland) 40%, var(--bh-bg)); stroke: var(--c-gland); stroke-width: 2; }
-.en-vis .lane-target { fill: color-mix(in srgb, var(--bh-ink) 10%, transparent); stroke: color-mix(in srgb, var(--bh-ink) 50%, transparent); stroke-width: 2; transition: fill .25s ease-out, stroke .25s; }
-.en-vis .lane-target.slow { transition: fill 1.2s ease, stroke 1.2s; }
-.en-vis .lane-target.on { fill: var(--tc); stroke: var(--tc); }
-.en-vis .lane-txt { font-family: var(--font); font-size: 15px; fill: var(--bh-soft); }
-@container (max-width: 520px) { .en-vis .en-lanes { grid-template-columns: 1fr; } }
+.en3-panel { width: min(380px, 46%); border-radius: 16px; background: rgba(11,17,34,.93); border: 1px solid rgba(220,230,255,.18);
+  box-shadow: 0 8px 24px rgba(0,0,0,.35); color: #F3F6FF; padding: 10px 12px 12px; font: 15px/1.35 var(--font, system-ui, sans-serif); }
+.en3-panel h3 { margin: 0 0 4px; font-size: 16px; color: #F3F6FF; }
+.en3-panel p { margin: 4px 0 0; color: #C9D3EE; font-size: 15px; }
+.en3-panel svg { width: 100%; height: auto; display: block; }
+.en3-receptor { position: absolute; right: 12px; z-index: 3; }
+.en3-cmp { width: 100%; max-width: 760px; }
+.en3-cmp table { width: 100%; border-collapse: collapse; font-size: 15px; color: #F3F6FF; }
+.en3-cmp th, .en3-cmp td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,.14); }
+.en3-cmp thead th { color: #C9D3EE; }
+.en3-cmp tbody th { color: #C9D3EE; font-weight: 700; width: 24%; }
+.en3-tube { fill: rgba(255,112,136,.18); stroke: rgba(255,112,136,.7); stroke-width: 2; }
+.en3-cell { fill: rgba(255,255,255,.07); stroke: rgba(230,236,255,.5); stroke-width: 2; transition: fill .6s, stroke .6s; }
+.en3-cell.responds { fill: rgba(255,210,122,.32); stroke: #FFD27A; }
+.en3-nuc { fill: rgba(255,255,255,.14); }
+.en3-rec { fill: none; stroke: rgba(240,244,255,.85); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
+.en3-hor { fill: #FFD27A; stroke: #0b1120; stroke-width: 1; }
+.en3-mover { transition: transform 2.2s cubic-bezier(.45,.05,.35,1); }
+.en3-txt { font: 600 15px var(--font, system-ui); fill: #E8EDFF; }
+@media (prefers-reduced-motion: reduce) { .en3-mover, .en3-cell { transition: none; } }
 `;
 
-function insetFrame(name, cx, cy, r, inner, id) {
-  return `<g class="en-inset" data-inset="${name}" transform="translate(${cx} ${cy})">
-    <clipPath id="${id}-clip-${name}"><circle r="${r}"/></clipPath>
-    <circle class="en-inset-bg" r="${r}"/>
-    <g clip-path="url(#${id}-clip-${name})">${inner}</g>
-    <circle class="en-inset-ring" r="${r}"/>
-  </g>`;
-}
-
-// Inset geometry (stage space)
-const IN = {
-  receptor: { c: [620, 300], r: 150, zoom: O(176, 140) },
-  pituitary: { c: [150, 190], r: 125, zoom: O(120, 47.8) },
-  adrenal: { c: [640, 330], r: 128, zoom: O(146, 220.5) },
-};
-
 const TRI = 'M-6.5,-5 L6.5,-5 L0,6.5 Z';
-function receptorInset() {
+function receptorSVG() {
   const cups = (cx, cy, r, shape) => [-125, -90, -55].map((a) => {
     const rad = (a * Math.PI) / 180, x = cx + r * Math.cos(rad), y = cy + r * Math.sin(rad);
     const d = shape === 'v' ? 'M-8,-9 L0,0 L8,-9' : 'M-7,-9 L-7,0 L7,0 L7,-9';
-    return `<path class="en-rec" d="${d}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a + 90})"/>`;
+    return `<path class="en3-rec" d="${d}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${a + 90})"/>`;
   }).join('');
-  return `<rect class="en-tube" x="-170" y="-98" width="340" height="44" rx="8"/>
-    <circle class="en-cell" data-cell="a" cx="-64" cy="48" r="50"/><circle class="en-nucleus" cx="-64" cy="56" r="15"/>${cups(-64, 48, 50, 'v')}
-    <circle class="en-cell" data-cell="b" cx="70" cy="48" r="50"/><circle class="en-nucleus" cx="70" cy="56" r="15"/>${cups(70, 48, 50, 'sq')}
-    <path class="en-hormone en-docked" d="${TRI}" transform="translate(-64 -6)"/>
-    <path data-ipath="flow" d="M-170,-76 L170,-76" fill="none"/>
-    <path data-ipath="dock" d="M-150,-76 C-110,-76 -64,-66 -64,-6" fill="none"/>`;
-}
-function pituitaryInset() {
-  return `<path class="en-brainmass" d="M-140,20 C-130,-80 -50,-130 20,-126 C90,-122 140,-70 140,0 L140,20 C90,30 50,24 30,12 C16,4 -16,4 -30,12 C-60,28 -100,30 -140,20 Z"/>
-    <path class="en-gyri" d="M-110,-20 C-96,-34 -84,-14 -70,-30 C-58,-44 -46,-24 -34,-38 M30,-40 C44,-56 56,-34 70,-50 C82,-62 94,-42 108,-54 M-80,-70 C-66,-84 -50,-66 -36,-82 M40,-92 C54,-102 66,-86 80,-96"/>
-    <ellipse class="en-hypo" cx="0" cy="-8" rx="34" ry="19"/>
-    <path class="en-stalk" d="M0,10 C1,24 2,34 3,44"/>
-    <path class="en-bone" d="M-42,62 C-36,96 42,96 48,62"/>
-    <ellipse class="en-pit" cx="3" cy="62" rx="28" ry="20"/>
-    <path data-ipath="hp" d="M0,-6 C1,18 2,36 3,56" fill="none"/>
-    <path data-ipath="out" d="M3,70 C4,92 6,108 8,130" fill="none"/>`;
-}
-function adrenalInset() {
-  return `<ellipse class="en-kidney" cx="0" cy="150" rx="120" ry="70"/>
-    <path class="en-cortex" d="M-96,62 C-86,-14 -34,-82 8,-88 C52,-82 90,-14 98,62 C42,84 -42,84 -96,62 Z"/>
-    <path class="en-medulla" d="M-52,44 C-44,-4 -12,-44 8,-48 C32,-44 58,-4 58,44 C22,56 -20,56 -52,44 Z"/>`;
+  return `<svg viewBox="-170 -110 340 215" role="img" aria-label="Zoomed in: a hormone in the blood fits the receptor on a target cell, like a key in a lock. The other cell has no matching receptor, so it does not respond.">
+    <rect class="en3-tube" x="-168" y="-104" width="336" height="42" rx="8"/>
+    <text class="en3-txt" x="0" y="-74" text-anchor="middle" style="font-size:14px">blood vessel</text>
+    <path class="en3-hor" d="${TRI}" transform="translate(-140 -90)"/><path class="en3-hor" d="${TRI}" transform="translate(80 -88)"/><path class="en3-hor" d="${TRI}" transform="translate(140 -92)"/>
+    <circle class="en3-cell" data-cell="a" cx="-70" cy="42" r="48"/><circle class="en3-nuc" cx="-70" cy="50" r="14"/>${cups(-70, 42, 48, 'v')}
+    <circle class="en3-cell" cx="72" cy="42" r="48"/><circle class="en3-nuc" cx="72" cy="50" r="14"/>${cups(72, 42, 48, 'sq')}
+    <path class="en3-hor en3-mover" data-mover d="${TRI}" style="transform: translate(-110px, -84px)"/>
+    <text class="en3-txt" x="-70" y="104" text-anchor="middle">target cell</text>
+    <text class="en3-txt" x="72" y="104" text-anchor="middle">not a target</text>
+  </svg>`;
 }
 
 export default {
@@ -268,249 +299,82 @@ export default {
   visual: {
     dark: true,
     async create(container) {
-      injectBodyCSS();
-      injectCSS('en-vis-css', CSS);
-      const id = uid('en');
-      const targets = Object.entries(TARGETS).map(([k, [x, y]]) => `<circle class="bh-target" data-target="${k}" cx="${x}" cy="${y}" r="3.2"/>`).join('')
-        + `<circle class="bh-target" data-target="heart" cx="128" cy="168" r="0"/>`;
-      const connector = (name) => {
-        const { c, r, zoom } = IN[name];
-        const a = Math.atan2(zoom[1] - c[1], zoom[0] - c[0]);
-        const sx = c[0] + r * Math.cos(a), sy = c[1] + r * Math.sin(a);
-        return `<g class="en-inset" data-inset="${name}"><line class="en-connector" x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${zoom[0]}" y2="${zoom[1]}"/><circle class="en-zoomring" cx="${zoom[0]}" cy="${zoom[1]}" r="9"/></g>`;
-      };
-      const root = document.createElement('div');
-      root.className = 'bhv en-vis';
-      root.innerHTML = `
-        <div class="en-svgwrap">
-        <svg class="bh-svg diagram" viewBox="0 0 800 600" role="img" aria-label="Body diagram">
-          ${defs(id)}
-          <defs>
-            <linearGradient id="${id}-fadeg" x1="0" y1="0" x2="0" y2="1"><stop offset=".84" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>
-            <mask id="${id}-fade" maskUnits="userSpaceOnUse" x="0" y="0" width="800" height="600"><rect width="800" height="600" fill="url(#${id}-fadeg)"/></mask>
-          </defs>
-          <g mask="url(#${id}-fade)">
-            <g class="en-body" transform="translate(${TX} ${TY}) scale(${S})">
-              ${svg.silhouette(id)}
-              <g>${svg.lungs()}${svg.liver('liver organ')}${svg.kidneys('kidneys organ')}${svg.stomach()}${svg.gut()}${svg.bladder()}${svg.heart('heart organ')}</g>
-              ${svg.brain('brain')}
-              ${svg.vessels('vessels')}
-              <g data-part="targets">${targets}</g>
-              ${svg.hypothalamus('hypothalamus')}${svg.pineal('pineal')}${svg.pituitary('pituitary')}${svg.thyroid('thyroid')}
-              ${svg.adrenals('adrenals')}${svg.pancreas('pancreas')}${svg.ovaries('ovaries')}${svg.testes('testes')}
-              ${routePaths()}
-              <g class="en-fx"></g>
-            </g>
-          </g>
-          ${connector('receptor')}${connector('pituitary')}${connector('adrenal')}
-          ${insetFrame('receptor', ...IN.receptor.c, IN.receptor.r, receptorInset() + '<g class="en-ifx"></g>', id)}
-          ${insetFrame('pituitary', ...IN.pituitary.c, IN.pituitary.r, pituitaryInset() + '<g class="en-ifx"></g>', id)}
-          ${insetFrame('adrenal', ...IN.adrenal.c, IN.adrenal.r, adrenalInset(), id)}
-          <g class="en-labels"></g>
-        </svg></div>
-        <div class="en-compare" hidden>
-          <div class="en-lanes">
-            <div class="en-lane">
-              <h3>Nervous system</h3>
-              <svg viewBox="0 0 300 92" role="img" aria-label="A fast electrical impulse travels along a neuron to a muscle. The muscle responds briefly.">
-                <path class="lane-nerve" d="M8,30 L22,40 M8,60 L22,50 M12,46 L22,46"/>
-                <circle class="lane-soma" cx="30" cy="46" r="11"/>
-                <path class="lane-nerve" data-lane="axon" d="M41,46 L258,46"/>
-                ${[60, 104, 148, 192, 236].map((x) => `<rect class="lane-myelin" x="${x}" y="39" width="34" height="14" rx="7"/>`).join('')}
-                <circle class="lane-target" data-lt="n" style="--tc: var(--c-pns)" cx="280" cy="46" r="13"/>
-                <text class="lane-txt" x="298" y="84" text-anchor="end">muscle</text>
-                <g class="lane-fx"></g>
-              </svg>
-              <p><strong>Very fast</strong> · effect is <strong>short-lived</strong></p>
-            </div>
-            <div class="en-lane">
-              <h3>Endocrine system</h3>
-              <svg viewBox="0 0 300 92" role="img" aria-label="A gland releases hormone into a blood vessel. It travels slowly to a target cell, which stays switched on for longer.">
-                <circle class="lane-gland" cx="22" cy="46" r="15"/>
-                <path class="lane-vessel" data-lane="vessel" d="M38,46 C78,16 108,76 148,46 C188,16 218,76 258,46"/>
-                <circle class="lane-target slow" data-lt="e" style="--tc: var(--c-hormone)" cx="280" cy="46" r="13"/>
-                <text class="lane-txt" x="22" y="84" text-anchor="middle">gland</text>
-                <text class="lane-txt" x="298" y="84" text-anchor="end">target</text>
-                <g class="lane-fx"></g>
-              </svg>
-              <p><strong>Slower</strong> · effect <strong>lasts longer</strong></p>
-            </div>
-          </div>
-          <table>
-            <thead><tr><th scope="col"></th><th scope="col">Nervous system</th><th scope="col">Endocrine system</th></tr></thead>
-            <tbody>
-              <tr><th scope="row">Message</th><td>Electrical impulses (and neurotransmitters at synapses)</td><td>Hormones</td></tr>
-              <tr><th scope="row">Travels</th><td>Along neurons</td><td>In the bloodstream</td></tr>
-              <tr><th scope="row">Speed</th><td>Very fast</td><td>Slower</td></tr>
-              <tr><th scope="row">Effects last</th><td>A short time</td><td>Longer</td></tr>
-              <tr><th scope="row">Acts on</th><td>The muscles and glands its neurons reach</td><td>Any target cell with the right receptor</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="bh-foot"><p class="vis-caption" aria-hidden="true"></p></div>`;
-      container.append(root);
+      if (!document.getElementById('en3-css')) { const s = document.createElement('style'); s.id = 'en3-css'; s.textContent = CSS; document.head.append(s); }
+      const stage = bodyStage(container, { label: '3D body showing the endocrine glands' });
+      const v = stage.viewer;
+      // receptor close-up (2D: cells and receptors are far too small to see on a whole body)
+      const rec = document.createElement('div');
+      rec.className = 'en3-panel en3-receptor';
+      rec.innerHTML = `<h3>Zoomed in: a target cell</h3>${receptorSVG()}<p>The hormone fits its receptor like a key in a lock, so the cell responds.</p>`;
+      rec.hidden = true;
+      stage.root.append(rec);
+      const mover = rec.querySelector('[data-mover]');
+      const cellA = rec.querySelector('[data-cell="a"]');
+      // comparison table
+      const cmp = document.createElement('div');
+      cmp.className = 'en3-panel en3-cmp';
+      cmp.innerHTML = `<table>
+        <thead><tr><th scope="col"></th><th scope="col">Nervous system</th><th scope="col">Endocrine system</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Message</th><td>Electrical impulses (and neurotransmitters at synapses)</td><td>Hormones</td></tr>
+          <tr><th scope="row">Travels</th><td>Along neurons</td><td>In the bloodstream</td></tr>
+          <tr><th scope="row">Speed</th><td>Very fast</td><td>Slower</td></tr>
+          <tr><th scope="row">Effects last</th><td>A short time</td><td>Longer</td></tr>
+          <tr><th scope="row">Acts on</th><td>The muscles and glands its neurons reach</td><td>Any target cell with the right receptor</td></tr>
+        </tbody></table>`;
+      cmp.hidden = true;
+      stage.dock.append(cmp);
+      // the page shows straight away; the 3D model fills in when it has loaded
+      let loaded = false, pending = null;
+      v.ready.then(() => { loaded = true; if (pending !== null) api.show(pending); });
 
-      const svgRoot = root.querySelector('.bh-svg');
-      const wrap = root.querySelector('.en-svgwrap');
-      const cmp = root.querySelector('.en-compare');
-      const cap = root.querySelector('.vis-caption');
-      const labels = createLabels(svgRoot.querySelector('.en-labels'), VB);
-      const anim = createAnimator(svgRoot.querySelector('.en-fx'));
-      const ianim = { receptor: createAnimator(svgRoot.querySelector('[data-inset="receptor"] .en-ifx')), pituitary: createAnimator(svgRoot.querySelector('[data-inset="pituitary"] .en-ifx')) };
-      const lanes = [...root.querySelectorAll('.en-lane svg')].map((s) => createAnimator(s.querySelector('.lane-fx')));
-      const unwatch = watchScale(svgRoot, VB, (k) => labels.setScale(k));
-      const route = (n) => svgRoot.querySelector(`[data-route="${n}"]`);
-      const ip = (inset, n) => svgRoot.querySelector(`[data-inset="${inset}"] [data-ipath="${n}"]`);
-      const hormone = () => { const p = svgEl('path', { d: TRI, class: 'en-hormone' }); return p; };
-      const smallHormone = () => svgEl('path', { d: 'M-2.6,-2 L2.6,-2 L0,2.6 Z', class: 'en-hormone' });
-      const ctl = playAgainButton(root.querySelector('.bh-foot'), () => play(current));
+      const placeRec = () => {
+        rec.style.top = `${stage.cap.offsetTop + stage.cap.offsetHeight + 10}px`;
+        stage.extraSafe = rec.hidden ? null : { right: rec.offsetWidth + 20 };
+        stage.refreshSafe();
+      };
+      function receptorAnim(tok) {
+        mover.style.transition = 'none';
+        mover.style.transform = 'translate(-110px, -84px)';
+        cellA.classList.remove('responds');
+        if (reducedMotion()) { mover.style.transform = 'translate(-70px, -12px)'; cellA.classList.add('responds'); return; }
+        void mover.getBoundingClientRect();
+        mover.style.transition = '';
+        v.wait(0.4).then((ok) => { if (ok && v.alive(tok)) mover.style.transform = 'translate(-70px, -12px)'; });
+        v.wait(2.8).then((ok) => { if (ok && v.alive(tok)) cellA.classList.add('responds'); });
+      }
+
       let current = -1;
-
-      const H = { color: 'var(--c-hormone)', r: 2.2, make: smallHormone };
-      const hit = (names) => names.forEach((n) => svgRoot.querySelector(`[data-target="${n}"]`)?.classList.add('hit'));
-      async function spread(t, out, to, { count = 3 } = {}) {
-        await anim.stream(route(out), { ...H, count, spacing: 320, dur: 1500 });
-        if (!anim.alive(t)) return;
-        await Promise.all(to.map((n) => anim.stream(route(n), { ...H, count: 2, spacing: 380, dur: 1800 })));
-        if (!anim.alive(t)) return;
-        hit(to.map((n) => n.replace(/^to/, '')));
+      function show(step) {
+        current = step;
+        const inRange = step >= 0 && step < STEPS.length;
+        const st = inRange ? STEPS[step] : STEPS[0];
+        v.setInset(inRange && st.inset ? st.inset : null);
+        v.setState(st.spec);
+        v.frame(st.frame);
+        rec.hidden = !(inRange && st.receptor);
+        cmp.hidden = !(inRange && st.compare);
+        placeRec();
+        let caption = st.caption, labels = st.labels;
+        if (step < 0) { caption = 'The main glands of the endocrine system'; labels = STEPS[0].labels; }
+        if (step >= STEPS.length) { caption = 'The glands and the hormones they release'; labels = RECAP_LABELS; }
+        v.setLabels(labels);
+        stage.setCaption(caption, inRange ? st.note : '');
+        stage.describe(`Labels: ${labels.map((l) => `${l.text}${l.sub ? ` (${l.sub})` : ''}`).join('; ')}.`);
+        stage.bar.showMotion(inRange);
+        const run = () => stage.play(async (tok) => {
+          if (st.receptor) receptorAnim(tok);
+          await st.play(v, tok);
+        });
+        stage.handlers.replay = inRange ? run : null;
+        if (inRange) run(); else v.clearAnim();
       }
 
-      async function play(step) {
-        const t = anim.clear();
-        Object.values(ianim).forEach((a) => a.clear());
-        lanes.forEach((a) => a.clear());
-        svgRoot.querySelectorAll('.bh-target.hit').forEach((e) => e.classList.remove('hit'));
-        svgRoot.querySelectorAll('.en-cell.responds, .en-docked.on').forEach((e) => e.classList.remove('responds', 'on'));
-        root.querySelectorAll('.lane-target.on').forEach((e) => e.classList.remove('on'));
-        const rm = anim.reduced();
-        const all = ['headL', 'headR', 'armL', 'armR', 'legL', 'legR'];
-        switch (step) {
-          case 0: {
-            const outs = ['pituitaryOut', 'thyroidOut', 'adrenalLOut', 'adrenalROut', 'ovaryLOut', 'ovaryROut', 'testisLOut', 'testisROut'];
-            await Promise.all([...outs.map((o, i) => anim.stream(route(o), { ...H, count: 2, spacing: 400, dur: 1600, delay: i * 120 })),
-              anim.stream(route('pancreasOut'), { ...H, count: 2, spacing: 400, dur: 900 })]);
-            if (!anim.alive(t)) return;
-            await Promise.all(['armL', 'armR', 'legL', 'legR'].map((n) => anim.stream(route(n), { ...H, count: 2, spacing: 400, dur: 1800 })));
-            break;
-          }
-          case 1: {
-            const ia = ianim.receptor;
-            const tok = ia.token;
-            const big = { color: 'var(--c-hormone)', make: hormone, dur: 3200, linear: true, noTrail: true };
-            ia.stream(ip('receptor', 'flow'), { ...big, count: 4, spacing: 900 });
-            if (rm) { ia.trail(ip('receptor', 'flow'), { color: 'var(--c-hormone)', r: 4, n: 5 }); }
-            await ia.pulse(ip('receptor', 'dock'), { color: 'var(--c-hormone)', make: hormone, dur: 2200, delay: 600, keep: false, noTrail: true });
-            if (!ia.alive(tok)) return;
-            svgRoot.querySelector('.en-docked').classList.add('on');
-            svgRoot.querySelector('[data-cell="a"]').classList.add('responds');
-            break;
-          }
-          case 2: {
-            const ia = ianim.pituitary;
-            const tok = ia.token;
-            await ia.pulse(ip('pituitary', 'hp'), { color: 'var(--c-brainpart)', r: 6, dur: 1200 });
-            if (!ia.alive(tok)) return;
-            ia.stream(ip('pituitary', 'out'), { color: 'var(--c-gland)', r: 5, count: 3, spacing: 300, dur: 1000 });
-            await spread(t, 'pituitaryOut', ['toThyroid', 'toAdrenalL', 'toAdrenalR', 'toOvaryL', 'toOvaryR', 'toTestisL', 'toTestisR']);
-            break;
-          }
-          case 3:
-            await spread(t, 'thyroidOut', [...all, 'toLungL']);
-            hit(['heart', ...all]);
-            break;
-          case 4:
-            await spread(t, 'adrenalROut', ['armL', 'armR', 'legL', 'legR', 'headL', 'headR']);
-            anim.stream(route('adrenalLOut'), { ...H, count: 2, spacing: 320, dur: 1500 });
-            break;
-          case 5:
-            await anim.stream(route('pancreasOut'), { ...H, count: 3, spacing: 300, dur: 1000 });
-            if (!anim.alive(t)) return;
-            await anim.stream(route('pancreasToHeart'), { ...H, count: 2, spacing: 300, dur: 900 });
-            if (!anim.alive(t)) return;
-            await Promise.all(['legL', 'legR', 'armL', 'armR'].map((n) => anim.stream(route(n), { ...H, count: 2, spacing: 380, dur: 1800 })));
-            hit(['legL', 'legR', 'armL', 'armR']);
-            break;
-          case 6:
-            await Promise.all(['ovaryLOut', 'ovaryROut', 'testisLOut', 'testisROut'].map((o) => anim.stream(route(o), { ...H, count: 2, spacing: 380, dur: 1700 })));
-            if (!anim.alive(t)) return;
-            await Promise.all(['armL', 'armR', 'legL', 'legR', 'headL', 'headR'].map((n) => anim.stream(route(n), { ...H, count: 1, dur: 1800 })));
-            hit(['armL', 'armR', 'legL', 'legR', 'headL', 'headR']);
-            break;
-          case 7: {
-            const [na, ea] = lanes;
-            const axon = root.querySelector('[data-lane="axon"]'), vessel = root.querySelector('[data-lane="vessel"]');
-            const nt = root.querySelector('[data-lt="n"]'), et = root.querySelector('[data-lt="e"]');
-            const tok = na.token;
-            if (rm) {
-              na.trail(axon, { color: 'var(--c-pns)', r: 4, n: 5 });
-              ea.trail(vessel, { color: 'var(--c-hormone)', r: 4, n: 6 });
-              et.classList.add('on');
-              break;
-            }
-            // endocrine: a slow stream that keeps the target switched on
-            ea.stream(vessel, { color: 'var(--c-hormone)', r: 4.5, count: 5, spacing: 500, dur: 3400, linear: true }).then(() => {});
-            ea.wait(3300).then((ok) => { if (ok) et.classList.add('on'); });
-            // nervous: three quick impulses, each giving a brief response
-            for (let i = 0; i < 3; i++) {
-              await na.pulse(axon, { color: 'var(--c-pns)', r: 5, dur: 380, linear: true });
-              if (!na.alive(tok)) return;
-              nt.classList.add('on');
-              await na.wait(450);
-              nt.classList.remove('on');
-              if (!(await na.wait(800))) return;
-            }
-            break;
-          }
-          default:
-        }
-      }
-
-      return {
-        show(step) {
-          current = step;
-          const isCmp = step === 7;
-          const st = step < 0 || step >= STEPS.length ? STEPS[0] : STEPS[step];
-          wrap.hidden = isCmp;
-          cmp.hidden = !isCmp;
-          cap.textContent = step < 0 ? 'The main glands of the endocrine system' : step >= STEPS.length ? 'The glands and the hormones they release' : st.caption;
-          if (step >= STEPS.length) {
-            labels.set([
-              { ...GLAND_LABELS[0], sub: 'controls other glands' }, { ...GLAND_LABELS[1], sub: 'thyroxine' }, { ...GLAND_LABELS[2], sub: 'adrenaline (medulla)\ncortisol (cortex)' },
-              { ...GLAND_LABELS[3], sub: '(in females)\noestrogen' }, { ...GLAND_LABELS[5], sub: 'insulin' }, { ...GLAND_LABELS[6], sub: '(in males)\ntestosterone' },
-            ]);
-            light(svgRoot, ['pituitary', 'thyroid', 'adrenals', 'pancreas', 'ovaries', 'testes', 'vessels']);
-          } else if (!isCmp) {
-            light(svgRoot, st.on);
-            labels.set(st.labels);
-          }
-          svgRoot.querySelectorAll('.en-inset').forEach((g) => g.classList.toggle('show', !!st.inset && g.dataset.inset === st.inset && step >= 0 && step < STEPS.length));
-          // labels for things inside the insets
-          if (step === 1) {
-            labels.set([
-              { at: [620, 224], side: 'manual', x: 620, y: 120, anchor: 'middle', text: 'Hormones in the blood', color: 'var(--c-hormone)' },
-              { at: [556, 398], side: 'manual', x: 556, y: 495, anchor: 'middle', text: 'Target cell', sub: 'right receptor:\nit responds', short: 'Target\ncell', color: 'var(--c-hormone)' },
-              { at: [690, 398], side: 'manual', x: 708, y: 495, anchor: 'middle', text: 'Not a target', sub: 'no matching\nreceptor', short: 'Not a\ntarget', color: 'var(--bh-soft)' },
-            ]);
-          } else if (step === 2) {
-            labels.set([...st.labels,
-              { at: [150, 182], side: 'manual', x: 150, y: 36, anchor: 'middle', text: 'Hypothalamus', sub: 'part of the brain', color: 'var(--c-brainpart)' },
-              { at: [153, 262], side: 'manual', x: 150, y: 352, anchor: 'middle', text: 'Pituitary gland', sub: 'the “master gland”', color: 'var(--c-gland)' },
-            ]);
-          } else if (step === 4) {
-            labels.set([...st.labels,
-              { at: [598, 300], side: 'manual', x: 640, y: 168, anchor: 'middle', text: 'Adrenal cortex', sub: 'outer layer → cortisol', short: 'Cortex:\ncortisol', color: 'var(--c-gland)' },
-              { at: [646, 340], side: 'manual', x: 640, y: 500, anchor: 'middle', text: 'Adrenal medulla', sub: 'middle → adrenaline', short: 'Medulla:\nadrenaline', color: 'var(--c-sym)' },
-            ]);
-          }
-          const text = cap.textContent;
-          svgRoot.setAttribute('aria-label', `Body diagram on a dark background. ${text}.`);
-          ctl.show(step >= 0 && step < STEPS.length);
-          if (step >= 0 && step < STEPS.length) play(step);
-          else { anim.clear(); Object.values(ianim).forEach((a) => a.clear()); }
-        },
-        dispose() { anim.clear(); Object.values(ianim).forEach((a) => a.clear()); lanes.forEach((a) => a.clear()); unwatch(); root.remove(); },
+      const api = {
+        show(step) { if (!loaded) { pending = step; return; } show(step); },
+        dispose() { stage.dispose(); },
       };
+      return api;
     },
   },
 };
