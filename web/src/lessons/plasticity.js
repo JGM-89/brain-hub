@@ -1,59 +1,34 @@
 // Plasticity and functional recovery after trauma — AQA 7182 4.2.2 (A-level only).
-// Visual: hand-drawn SVG on the dark stage.
-//   1. A neural network you can "Practise" or "Let time pass" on (use it or lose it).
-//   2. Maguire et al. (2000): hippocampus outline + clearly illustrative bars.
-//   3. Kühn et al. (2014) and Davidson et al. (2004).
-//   4. A damage scenario: a top view of the brain plus a zoomed-in patch of neurons,
-//      stepping through unmasking, sprouting, homologous areas, blood vessels and super-sensitivity.
-//   5. Evaluation panels (illustrative graphs, labelled as such).
+// Visual (3D):
+//   - A procedural 3D network of neurons (a MODEL, not data): "Practise" thickens and lights the used
+//     pathway; "Let time pass" weakens unused connections until they are pruned.
+//   - Maguire et al. (2000): the real hippocampus (FreeSurfer aseg) inside the real brain, split along its
+//     long axis so the posterior part can be highlighted. Bars and scatter are illustrative.
+//   - Kühn et al. (2014): real right hippocampus, both cerebellar hemispheres and an approximate right
+//     dorsolateral prefrontal patch. Davidson et al. (2004): illustrative gamma traces.
+//   - Functional recovery: damage to Broca's area on the real left inferior frontal gyrus, then a
+//     zoomed-in 3D micro-network for unmasking, sprouting, new blood vessels and super-sensitivity,
+//     and the matching (homologous) area lit on the right hemisphere.
+//   - Evaluation charts are illustrative (direction only).
+import * as THREE from 'three';
+import { BrainViewer } from '../brain/viewer.js';
 import { reducedMotion } from '../settings.js';
+import { createStage, setControls, createLabels, createChips, createPanel, freeRectFor } from '../three/stage-ui.js';
+import { quietPicking, installViewShift, setViewerRunning, cortexLayer, mirrorRegionMask, splitLongAxis, styleStructures, flyTo, toWorld, snapToRegion, regionCentre, fromRAS } from '../three/brain-fx.js';
+import { NetScene } from '../three/netscene.js';
 
-/* ------------------------------------------------------------------ colours (dark stage only) */
 const C = {
-  ink: '#ECEFF7', soft: '#AEB8D2', faint: '#5E6A8A', node: '#16223D',
-  cyan: '#73D3FF', link: '#86A8E6', amber: '#FFC965', mint: '#7DE8B4',
-  rose: '#FF8DA1', violet: '#C9AAFF', red: '#FF8A7A',
-  panel: 'rgba(255,255,255,0.045)', panelLine: 'rgba(255,255,255,0.12)',
+  ink: '#ECEFF7', soft: '#C9D2E6', faint: '#5E6A8A', cyan: '#73D3FF', link: '#86A8E6', amber: '#FFC965',
+  mint: '#7DE8B4', rose: '#FF8DA1', violet: '#C9AAFF', red: '#FF8A7A',
 };
 
-/* ------------------------------------------------------------------ tiny SVG helpers */
-function T(x, y, str, o = {}) {
-  const { size = 15, weight = 400, color = C.ink, anchor = 'start', lh = 1.3, cls = '', extra = '' } = o;
-  const lines = Array.isArray(str) ? str : [str];
-  return `<text x="${x}" y="${y}" font-size="${size}" font-weight="${weight}" text-anchor="${anchor}" style="fill:${color}" class="${cls}" ${extra}>${lines
-    .map((l, i) => `<tspan x="${x}" dy="${i ? (size * lh).toFixed(1) : 0}">${l}</tspan>`).join('')}</text>`;
-}
-// A label in a dark rounded box, centred on (x, y). `to` draws a leader line to a point.
-function pill(x, y, str, o = {}) {
-  const { size = 15, color = C.ink, border = 'rgba(255,255,255,.25)', cls = '', extra = '', to = null, lead = C.soft } = o;
-  const lines = Array.isArray(str) ? str : [str];
-  const w = Math.max(...lines.map((l) => l.length)) * size * 0.56 + 20;
-  const h = lines.length * size * 1.3 + 12;
-  const leader = to ? `<line x1="${x}" y1="${y}" x2="${to[0]}" y2="${to[1]}" style="stroke:${lead}" stroke-width="1.5"/><circle cx="${to[0]}" cy="${to[1]}" r="3" style="fill:${lead}"/>` : '';
-  return `<g class="plx-pill ${cls}" ${extra}>${leader}<rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="9" style="fill:rgba(10,16,30,.9);stroke:${border}" stroke-width="1.5"/>${T(x, y - h / 2 + 6 + size * 0.98, lines, { size, weight: 700, color, anchor: 'middle' })}</g>`;
-}
-const panel = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="16" style="fill:${C.panel};stroke:${C.panelLine}" stroke-width="1.5"/>`;
-
-// Side view of a brain (front on the left), drawn in a 300 x 240 box.
-const BRAIN_LAT = `
-  <path d="M176 186 C180 204 178 220 172 236 L194 236 C196 218 200 200 204 180 Z" style="fill:#1A2744;stroke:#7F95C4" stroke-width="2"/>
-  <path d="M206 172 C214 200 262 206 280 180 C286 168 276 160 266 162 C248 168 226 166 206 172 Z" style="fill:#1E2C4B;stroke:#7F95C4" stroke-width="2"/>
-  <path d="M34 128 C22 78 62 30 132 22 C196 14 262 38 284 92 C296 122 290 150 268 160 C250 168 228 166 210 170 C196 174 186 184 168 188 C140 196 104 192 86 176 C76 168 70 160 58 158 C44 156 36 146 34 128 Z" style="fill:#1A2744;stroke:#8FA6D6" stroke-width="2.2"/>
-  <g style="fill:none;stroke:#3F5078" stroke-width="2" stroke-linecap="round">
-    <path d="M92 150 C120 136 160 130 200 136" style="stroke:#55679A"/>
-    <path d="M150 20 C142 52 160 78 146 122"/>
-    <path d="M62 80 C80 68 96 86 116 72"/><path d="M76 112 C94 104 108 120 126 110"/>
-    <path d="M196 44 C212 64 232 52 246 72"/><path d="M212 104 C230 94 246 114 264 104"/>
-    <path d="M116 168 C136 160 156 172 178 164"/><path d="M226 182 C240 188 256 186 270 178"/>
-  </g>`;
-const brainLat = (tx, ty, s, inner = '') => `<g transform="translate(${tx} ${ty}) scale(${s})">${BRAIN_LAT}${inner}</g>`;
-
-/* ------------------------------------------------------------------ scene 1: the network */
+/* ------------------------------------------------------------------ learning network (model) */
 const NODES = {
   a: [60, 200], b: [165, 150], c: [285, 185], d: [405, 140], e: [540, 180],
   f: [110, 290], g: [230, 280], h: [360, 295], i: [480, 280], j: [590, 290],
   k: [240, 85], l: [360, 75], m: [490, 80], n: [595, 110],
 };
+const ZOFF = { a: 0, b: 18, c: -10, d: 14, e: -4, f: -34, g: 30, h: -26, i: 22, j: -30, k: -36, l: 26, m: -22, n: 10 };
 const PATH = ['a', 'b', 'c', 'd', 'e'];
 // [from, to, starting strength 0–5, on the practised path?]
 const EDGES = [
@@ -62,264 +37,511 @@ const EDGES = [
   ['i', 'j', 1], ['j', 'e', 2], ['b', 'k', 1], ['k', 'c', 2], ['k', 'l', 3], ['l', 'd', 2], ['l', 'm', 1],
   ['m', 'd', 3], ['m', 'n', 2], ['n', 'e', 1], ['b', 'g', 2],
 ];
-const NEW_EDGE = 'b-g'; // the connection that "forms through learning" in step 1
+const NEW_EDGE = 'b-g';
+const RADIUS = [0.3, 0.7, 1.0, 1.35, 1.75, 2.2];
+const node3 = (k) => new THREE.Vector3((NODES[k][0] - 330) * 0.5, -(NODES[k][1] - 190) * 0.5, ZOFF[k]);
 
-function netSVG() {
-  const edges = EDGES.map(([u, v]) => {
-    const [x1, y1] = NODES[u], [x2, y2] = NODES[v];
-    return `<path class="plx-edge" data-e="${u}-${v}" d="M${x1} ${y1} L${x2} ${y2}" fill="none"/>`;
-  }).join('');
-  const nodes = Object.entries(NODES).map(([k, [x, y]]) =>
-    `<g class="plx-node" data-n="${k}"><circle cx="${x}" cy="${y}" r="12" style="fill:${C.node};stroke:${C.cyan}" stroke-width="2"/><circle class="plx-core" cx="${x}" cy="${y}" r="4.5" fill="${C.cyan}"/></g>`).join('');
-  const pathD = 'M' + PATH.map((k) => NODES[k].join(' ')).join(' L');
-  return `<g data-scene="net">
-    <path class="plx-pathglow" d="${pathD}" fill="none" style="stroke:${C.amber}" stroke-width="26" stroke-linecap="round" stroke-linejoin="round"/>
-    ${edges}${nodes}
-    <circle class="plx-pulse glow" r="7" cx="60" cy="200" fill="${C.amber}" filter="url(#plx-glow)" opacity="0"/>
-    ${T(20, 36, '', { size: 15, weight: 700, cls: 'plx-status' })}
-    ${T(620, 370, 'Thicker, brighter line = stronger connection', { size: 15, color: C.soft, anchor: 'end', cls: 'plx-key' })}
-    ${pill(330, 235, ['New connection', 'forms through learning'], { cls: 'plx-l-new', to: [200, 215] })}
-    ${pill(110, 112, 'Pathway you practise', { cls: 'plx-l-path', to: [112, 175], color: C.amber })}
-    ${pill(345, 112, 'Stronger with use', { cls: 'plx-l-strong', to: [345, 162], color: C.amber })}
-    ${pill(0, 0, 'Not used, so pruned', { cls: 'plx-l-pruned' })}
-    ${pill(175, 345, 'Not practised, so getting weaker', { cls: 'plx-l-weak' })}
-  </g>`;
-}
-
-/* ------------------------------------------------------------------ scene 2: Maguire */
-function maguireSVG() {
-  const hippo = `
-    <path d="M100 172 C112 174 126 175 140 174" fill="none" style="stroke:#7186B8" stroke-width="12" stroke-linecap="round"/>
-    <path class="glow" d="M140 174 C160 172 180 165 196 150" fill="none" style="stroke:${C.amber}" stroke-width="13" stroke-linecap="round" filter="url(#plx-glow)"/>`;
-  const dots = [[388, 338], [410, 333], [432, 330], [455, 323], [478, 320], [505, 314], [530, 307], [560, 301], [590, 291]]
-    .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="${C.amber}"/>`).join('');
-  return `<g data-scene="maguire">
-    ${brainLat(5, 75, 1.05, hippo)}
-    ${T(36, 322, 'Front', { color: C.soft })}${T(316, 322, 'Back', { color: C.soft, anchor: 'end' })}
-    ${pill(190, 46, ['Posterior (back) part:', 'larger in taxi drivers'], { to: [188, 247], color: C.amber })}
-    ${pill(122, 356, 'Hippocampus (deep inside)', { to: [132, 258] })}
-    ${T(340, 40, 'Posterior hippocampus grey matter', { weight: 700 })}
-    ${T(340, 60, '(illustrative, not real data)', { color: C.soft })}
-    <line x1="355" y1="190" x2="612" y2="190" style="stroke:${C.soft}" stroke-width="1.5"/>
-    <rect class="plx-bar" x="370" y="125" width="90" height="65" rx="6" style="fill:#7186B8"/>
-    <rect class="plx-bar glow" x="500" y="85" width="90" height="105" rx="6" style="fill:${C.amber}" filter="url(#plx-glow)"/>
-    ${T(415, 210, 'Control group', { anchor: 'middle' })}${T(545, 210, 'Taxi drivers', { anchor: 'middle', weight: 700 })}
-    ${T(340, 240, ['More years as a driver,', 'larger posterior hippocampus'], { weight: 700, lh: 1.25 })}
-    <line x1="370" y1="350" x2="612" y2="350" style="stroke:${C.soft}" stroke-width="1.5"/>
-    <line x1="370" y1="350" x2="370" y2="275" style="stroke:${C.soft}" stroke-width="1.5"/>
-    <path d="M380 342 L604 288" style="stroke:${C.amber}" stroke-width="2" stroke-dasharray="6 6" opacity=".8"/>
-    ${dots}
-    ${T(495, 372, 'Years as a taxi driver (illustrative)', { anchor: 'middle', color: C.soft })}
-    ${T(360, 314, 'Size', { anchor: 'middle', color: C.soft, extra: 'transform="rotate(-90 360 314)"' })}
-  </g>`;
-}
-
-/* ------------------------------------------------------------------ scene 3: Kühn and Davidson */
-function wavePath(x0, x1, y, amp, period) {
-  let d = '';
-  for (let x = x0; x <= x1; x += 1.5) {
-    const yy = y + amp * Math.sin(((x - x0) / period) * 2 * Math.PI) * (0.72 + 0.28 * Math.sin((x - x0) / 23));
-    d += `${d ? ' L' : 'M'}${x.toFixed(1)} ${yy.toFixed(1)}`;
-  }
-  return d;
-}
-function studiesSVG() {
-  const spots = `
-    <circle class="glow" cx="72" cy="82" r="10" fill="${C.amber}" filter="url(#plx-glow)"/>
-    <circle cx="150" cy="172" r="10" fill="${C.amber}" opacity=".9"/><circle cx="150" cy="172" r="16" fill="none" style="stroke:${C.amber}" stroke-width="2" stroke-dasharray="4 4"/>
-    <circle class="glow" cx="243" cy="186" r="10" fill="${C.amber}" filter="url(#plx-glow)"/>`;
-  return `<g data-scene="studies">
-    ${panel(12, 12, 304, 356)}${panel(324, 12, 304, 356)}
-    ${T(32, 44, 'Video games', { size: 17, weight: 700 })}${T(32, 66, 'Kühn et al. (2014)', { color: C.soft })}
-    ${brainLat(15, 95, 0.95, spots)}
-    ${pill(120, 100, 'Prefrontal cortex', { to: [83, 173], color: C.amber })}
-    ${pill(110, 338, 'Hippocampus', { to: [158, 258], color: C.amber })}
-    ${pill(252, 338, 'Cerebellum', { to: [246, 272], color: C.amber })}
-    ${T(344, 44, 'Meditation', { size: 17, weight: 700 })}${T(344, 66, 'Davidson et al. (2004)', { color: C.soft })}
-    ${T(344, 112, 'Students (new to meditation)', { color: C.soft })}
-    <path class="plx-wave" d="${wavePath(346, 606, 150, 5, 9)}" fill="none" style="stroke:#7186B8" stroke-width="2"/>
-    ${T(344, 206, 'Buddhist monks', { weight: 700, color: C.amber })}
-    <path class="plx-wave glow" d="${wavePath(346, 606, 256, 24, 9)}" fill="none" style="stroke:${C.amber}" stroke-width="2" filter="url(#plx-glow)"/>
-    ${T(344, 318, ['More gamma wave activity', 'in the monks (illustrative)'], { weight: 700 })}
-  </g>`;
-}
-
-/* ------------------------------------------------------------------ scene 4: damage and recovery */
-const IC = [165, 195]; // centre of the zoomed-in circle
+/* ------------------------------------------------------------------ recovery micro-network (model) */
 const RN = { d1: [100, 150], d2: [120, 230], d3: [85, 205], h1: [175, 100], h2: [240, 155], h3: [210, 245], h4: [150, 300], h5: [265, 240], h6: [190, 180] };
+const RZ = { d1: 10, d2: -12, d3: 22, h1: -14, h2: 16, h3: -8, h4: 12, h5: -20, h6: 4 };
+const rn3 = (k) => new THREE.Vector3((RN[k][0] - 175) * 1.2, -(RN[k][1] - 200) * 1.2, RZ[k]);
 const R_BROKEN = [['h1', 'd1'], ['h6', 'd3'], ['h3', 'd2'], ['h4', 'd2'], ['d1', 'd3']];
 const R_HEALTHY = [['h1', 'h2'], ['h2', 'h5'], ['h5', 'h3']];
 const R_DORMANT = [['h1', 'h6'], ['h4', 'h3'], ['h6', 'h3']];
-const R_SPROUT = ['M240 155 Q232 188 190 180', 'M265 240 Q236 306 150 300', 'M240 155 Q262 206 210 245'];
-const R_VESSEL_NEW = ['M172 326 C160 292 146 266 126 250', 'M238 320 C232 290 214 272 186 262'];
-const seg = (u, v) => `M${RN[u][0]} ${RN[u][1]} L${RN[v][0]} ${RN[v][1]}`;
+const R_SPROUT = [['h2', 'h6'], ['h5', 'h4'], ['h2', 'h3']];
+const HALOS = ['h1', 'h6', 'h3', 'h4'];
 
-function hemi(side) {
-  // Top view, front at the top. Left hemisphere is on the viewer's left.
-  const m = (x) => (side === 'L' ? x : 970 - x);
-  const P = (pts) => pts.map(([x, y]) => `${m(x)} ${y}`);
-  const [a, b, c, d, e, f, g, h, i, j] = P([[481, 50], [425, 46], [376, 96], [372, 176], [368, 256], [414, 318], [481, 322], [440, 100], [400, 200], [450, 270]]);
-  return `<path d="M${a} C${b} ${c} ${d} C${e} ${f} ${g} Z" style="fill:#1A2744;stroke:#8FA6D6" stroke-width="2.2"/>
-    <g style="fill:none;stroke:#3F5078" stroke-width="2" stroke-linecap="round">
-      <path d="M${P([[470, 80]])} Q${h} ${P([[400, 120]])}"/><path d="M${P([[468, 160]])} Q${i} ${P([[392, 236]])}"/><path d="M${P([[472, 230]])} Q${j} ${P([[420, 296]])}"/>
-    </g>`;
+/* ------------------------------------------------------------------ illustrative charts */
+function axes(g, x0, y0, x1, y1) { g.line([[x0, y1], [x0, y0], [x1, y0]], C.soft, 1.5); }
+function drawMaguire(g, grow) {
+  const half = g.h * 0.48;
+  // bars
+  const bx0 = 20, by0 = half - 30, bh = half - 70;
+  axes(g, bx0, by0, g.w - 16, by0 - bh - 10);
+  const bw = Math.min(110, (g.w - 80) / 3);
+  const xs = [bx0 + bw * 0.5, bx0 + bw * 2];
+  g.rect(xs[0], by0 - bh * 0.55 * grow, bw, bh * 0.55 * grow, '#7186B8');
+  g.ctx.save(); g.ctx.shadowColor = C.amber; g.ctx.shadowBlur = document.documentElement.dataset.calm === 'true' ? 0 : 12;
+  g.rect(xs[1], by0 - bh * 0.68 * grow, bw, bh * 0.68 * grow, C.amber); g.ctx.restore();
+  g.text(g.w - 16, 34, 'Not to scale', { align: 'right', color: C.soft });
+  g.text(xs[0] + bw / 2, by0 + 16, 'Control group', { align: 'center' });
+  g.text(xs[1] + bw / 2, by0 + 16, 'Taxi drivers', { align: 'center', weight: 700 });
+  g.text(bx0, 12, 'Posterior hippocampus grey matter', { weight: 700 });
+  // scatter
+  const sy0 = g.h - 40, sx0 = 30, sx1 = g.w - 16, sh = half - 70;
+  axes(g, sx0, sy0, sx1, sy0 - sh);
+  g.text(sx0, half + 12, 'More years as a driver, larger', { weight: 700 });
+  g.text(sx0, half + 32, '(right) posterior hippocampus', { weight: 700 });
+  const pts = [[0.05, 0.12], [0.14, 0.2], [0.22, 0.18], [0.31, 0.33], [0.42, 0.37], [0.5, 0.45], [0.61, 0.5], [0.72, 0.62], [0.83, 0.66], [0.94, 0.8]];
+  g.line([[sx0 + 0.02 * (sx1 - sx0), sy0 - 0.1 * sh], [sx0 + 0.98 * (sx1 - sx0), sy0 - 0.8 * sh]], 'rgba(255,201,101,.6)', 2, [6, 6]);
+  pts.forEach(([x, y], i) => { if (i / pts.length <= grow) g.dot(sx0 + x * (sx1 - sx0), sy0 - y * sh * 0.95, 5, C.amber); });
+  g.text((sx0 + sx1) / 2, sy0 + 18, 'Years as a taxi driver →', { align: 'center', color: C.soft });
 }
-function recoverySVG() {
-  const broken = R_BROKEN.map(([u, v]) => `<path class="plx-broken" d="${seg(u, v)}" stroke="${C.link}" stroke-width="3" fill="none" stroke-linecap="round"/>`).join('');
-  const healthy = R_HEALTHY.map(([u, v]) => `<path d="${seg(u, v)}" style="stroke:${C.link}" stroke-width="3" fill="none" stroke-linecap="round"/>`).join('');
-  const dorm = R_DORMANT.map(([u, v]) => `<path d="${seg(u, v)}" style="stroke:${C.faint}" stroke-width="2.5" stroke-dasharray="3 6" fill="none" stroke-linecap="round"/>
-      <path class="plx-unmask plx-grow glow" d="${seg(u, v)}" style="stroke:${C.cyan}" stroke-width="3.5" fill="none" stroke-linecap="round" filter="url(#plx-glow)"/>`).join('');
-  const sprouts = R_SPROUT.map((d) => `<path class="plx-sprout plx-grow glow" d="${d}" style="stroke:${C.mint}" stroke-width="3.5" fill="none" stroke-linecap="round" filter="url(#plx-glow)"/>`).join('');
-  const vessels = R_VESSEL_NEW.map((d) => `<path class="plx-vnew plx-grow" d="${d}" style="stroke:${C.rose}" stroke-width="5" fill="none" stroke-linecap="round"/>`).join('');
-  const halos = ['h6', 'h3', 'h4'].map((k) => `<circle class="plx-halo" cx="${RN[k][0]}" cy="${RN[k][1]}" r="21" fill="none" style="stroke:${C.amber}" stroke-width="2.5"/>`).join('');
-  const nodes = Object.entries(RN).map(([k, [x, y]]) => {
-    const dead = k[0] === 'd';
-    return `<g class="${dead ? 'plx-dnode' : ''}"><circle cx="${x}" cy="${y}" r="11" style="fill:${C.node};stroke:${C.cyan}" stroke-width="2"/><circle cx="${x}" cy="${y}" r="4" fill="${C.cyan}"/>${dead
-      ? `<g class="plx-x" style="stroke:${C.red}" stroke-width="3" stroke-linecap="round"><line x1="${x - 7}" y1="${y - 7}" x2="${x + 7}" y2="${y + 7}"/><line x1="${x + 7}" y1="${y - 7}" x2="${x - 7}" y2="${y + 7}"/></g>` : ''}</g>`;
-  }).join('');
-  return `<g data-scene="recovery">
-    <g class="plx-r-brain">
-      ${T(485, 30, '↑ Front', { anchor: 'middle', color: C.soft })}
-      ${hemi('L')}${hemi('R')}
-      ${T(426, 346, ['Left', 'hemisphere'], { anchor: 'middle', color: C.soft, lh: 1.2 })}
-      ${T(546, 346, ['Right', 'hemisphere'], { anchor: 'middle', color: C.soft, lh: 1.2 })}
-      <circle class="plx-bspot" cx="420" cy="150" r="24" fill="url(#plx-hatch)" style="stroke:${C.red}" stroke-width="2.5"/>
-      <circle class="plx-ring" cx="420" cy="150" r="30" fill="none" style="stroke:${C.soft}" stroke-width="1.5" stroke-dasharray="4 4"/>
-      <line x1="398" y1="136" x2="245" y2="80" style="stroke:${C.soft}" stroke-width="1.2" stroke-dasharray="4 5"/>
-      <line x1="400" y1="166" x2="245" y2="310" style="stroke:${C.soft}" stroke-width="1.2" stroke-dasharray="4 5"/>
-      <g class="plx-m-homo">
-        <circle class="plx-homo glow" cx="550" cy="150" r="24" fill="${C.violet}" filter="url(#plx-glow)"/>
-        <path class="plx-arc plx-grow" d="M444 140 Q485 108 524 140" fill="none" style="stroke:${C.violet}" stroke-width="3" marker-end="url(#plx-arrow)"/>
-      </g>
-    </g>
-    <g class="plx-r-inset">
-      <circle cx="${IC[0]}" cy="${IC[1]}" r="140" style="fill:#111B33;stroke:${C.soft}" stroke-width="2"/>
-      <g clip-path="url(#plx-inset-clip)">
-        <ellipse class="plx-dzone" cx="110" cy="190" rx="58" ry="80" fill="url(#plx-hatch)" style="stroke:${C.red}" stroke-width="2" stroke-dasharray="6 5"/>
-        <path d="M150 322 C200 334 262 314 302 252" style="stroke:${C.rose}" stroke-width="5" fill="none" opacity=".45" stroke-linecap="round"/>
-        <g class="plx-m-vessel">${vessels}</g>
-        ${healthy}${broken}
-        <g class="plx-m-unmask">${dorm}</g>
-        <g class="plx-m-sprout">${sprouts}</g>
-        <g class="plx-m-halo">${halos}</g>
-        ${nodes}
-      </g>
-    </g>
-    ${pill(292, 195, 'Zoomed in', { cls: 'plx-rl plx-rl-zoom', color: C.soft })}
-    ${pill(420, 212, ['Damage', '(e.g. stroke)'], { cls: 'plx-rl plx-rl-dmg', color: C.red, border: C.red })}
-    ${pill(100, 92, 'Neurons die', { cls: 'plx-rl plx-rl-dmg', color: C.red, border: C.red })}
-    ${pill(165, 32, 'Dormant synapses switch on', { cls: 'plx-rl plx-rl-5', to: [182, 140], color: C.cyan, lead: C.cyan })}
-    ${pill(165, 32, 'New nerve endings grow', { cls: 'plx-rl plx-rl-6', to: [226, 176], color: C.mint, lead: C.mint })}
-    ${pill(550, 78, ['Matching area on', 'the right helps'], { cls: 'plx-rl plx-rl-7', to: [550, 126], color: C.violet, lead: C.violet })}
-    ${pill(165, 32, 'Neurons become more sensitive', { cls: 'plx-rl plx-rl-8', to: [190, 159], color: C.amber, lead: C.amber })}
-    ${pill(165, 362, 'New blood vessels form', { cls: 'plx-rl plx-rl-8', to: [212, 288], color: C.rose, lead: C.rose })}
-  </g>`;
+function gammaTrace(g, x0, x1, y, amp, seed) {
+  const pts = []; let n = 0; let s = seed;
+  for (let x = x0; x <= x1; x += 1) {
+    s = (s * 9301 + 49297) % 233280; n = 0.7 * n + (s / 233280 - 0.5) * 0.8;
+    const t = (x - x0) / (x1 - x0);
+    pts.push([x, y - amp * (Math.sin(2 * Math.PI * 38 * t) * (0.75 + 0.25 * Math.sin(2 * Math.PI * 2.2 * t)) + n * 0.4)]);
+  }
+  return pts;
 }
-
-/* ------------------------------------------------------------------ scenes 5 and 6: evaluation */
-function evalASVG() {
-  return `<g data-scene="evalA">
-    ${panel(12, 12, 304, 356)}${panel(324, 12, 304, 356)}
-    ${T(32, 44, 'Age', { size: 17, weight: 700 })}
-    ${T(32, 68, ['How plastic the brain is,', 'across life (illustrative)'], { color: C.soft })}
-    <line x1="55" y1="300" x2="298" y2="300" style="stroke:${C.soft}" stroke-width="1.5"/>
-    <line x1="55" y1="300" x2="55" y2="112" style="stroke:${C.soft}" stroke-width="1.5"/>
-    <path class="plx-grow glow" d="M60 125 C110 135 140 225 195 245 C235 258 265 262 296 264" fill="none" style="stroke:${C.amber}" stroke-width="3.5" filter="url(#plx-glow)"/>
-    ${pill(226, 196, ['Reduces, but', 'never stops'], { to: [242, 257], color: C.amber })}
-    ${T(80, 322, 'Child', { anchor: 'middle', color: C.soft })}${T(176, 322, 'Adult', { anchor: 'middle', color: C.soft })}${T(270, 322, 'Older', { anchor: 'middle', color: C.soft })}
-    ${T(40, 210, 'Plasticity', { anchor: 'middle', color: C.soft, extra: 'transform="rotate(-90 40 210)"' })}
-    ${T(344, 44, 'Negative plasticity', { size: 17, weight: 700 })}
-    ${T(344, 68, 'Not every change is helpful.', { color: C.soft })}
-    <circle cx="349" cy="100" r="13" style="fill:#22325A;stroke:${C.soft}" stroke-width="2"/>
-    <rect x="334" y="118" width="30" height="92" rx="12" style="fill:#22325A;stroke:${C.soft}" stroke-width="2"/>
-    <rect x="356" y="132" width="94" height="26" rx="12" style="fill:#22325A;stroke:${C.soft}" stroke-width="2"/>
-    <rect x="450" y="134" width="88" height="22" rx="10" fill="none" style="stroke:${C.violet}" stroke-width="2.5" stroke-dasharray="6 5"/>
-    <ellipse cx="557" cy="145" rx="18" ry="14" fill="none" style="stroke:${C.violet}" stroke-width="2.5" stroke-dasharray="6 5"/>
-    ${pill(505, 96, 'Missing, but still felt', { to: [500, 134], color: C.violet, lead: C.violet })}
-    ${T(344, 238, 'Phantom limb', { weight: 700, color: C.violet })}
-    ${T(344, 262, ['Many people who lose a limb', 'still feel sensations in it.', 'This is linked to changes in', 'the somatosensory cortex.'], { lh: 1.35 })}
-  </g>`;
+function drawDavidson(g) {
+  const x0 = 12, x1 = g.w - 12;
+  const y1 = g.h * 0.3, y2 = g.h * 0.72;
+  g.text(x0, y1 - 46, 'Students, new to meditation', { color: C.soft });
+  g.line(gammaTrace(g, x0, x1, y1, 5, 7), '#7186B8', 1.8);
+  g.text(x0, y2 - 66, 'Buddhist monks (years of meditation)', { weight: 700, color: C.amber });
+  g.glowLine(gammaTrace(g, x0, x1, y2, 26, 11), C.amber, 1.8);
+  g.text(x0, g.h - 14, 'Monks: more gamma activity', { weight: 700 });
 }
-function evalBSVG() {
-  return `<g data-scene="evalB">
-    ${panel(12, 12, 304, 356)}${panel(324, 12, 304, 356)}
-    ${T(32, 44, 'Cognitive reserve', { size: 17, weight: 700 })}${T(32, 66, 'Schneider et al. (2014)', { color: C.soft })}
-    ${T(32, 98, ['Bar height: chance of a', 'disability-free recovery'], { weight: 700 })}
-    ${T(32, 140, '(illustrative: direction only)', { color: C.soft })}
-    <line x1="40" y1="300" x2="295" y2="300" style="stroke:${C.soft}" stroke-width="1.5"/>
-    <rect class="plx-bar" x="58" y="245" width="95" height="55" rx="6" style="fill:#7186B8"/>
-    <rect class="plx-bar glow" x="183" y="160" width="95" height="140" rx="6" style="fill:${C.amber}" filter="url(#plx-glow)"/>
-    ${T(105, 322, ['Fewer years', 'of education'], { anchor: 'middle', lh: 1.2 })}
-    ${T(230, 322, ['More years', 'of education'], { anchor: 'middle', weight: 700, lh: 1.2 })}
-    ${T(344, 44, 'Neurorehabilitation', { size: 17, weight: 700 })}${T(344, 66, 'Recovery over time (illustrative)', { color: C.soft })}
-    <line x1="360" y1="300" x2="608" y2="300" style="stroke:${C.soft}" stroke-width="1.5"/>
-    <line x1="360" y1="300" x2="360" y2="100" style="stroke:${C.soft}" stroke-width="1.5"/>
-    <path class="plx-grow" d="M360 300 C390 200 420 175 470 168 C520 164 560 164 606 163" fill="none" style="stroke:#9DB3E8" stroke-width="3.5"/>
-    <path class="plx-grow glow" d="M470 168 C520 152 560 132 606 118" fill="none" style="stroke:${C.mint}" stroke-width="3.5" stroke-dasharray="8 6" filter="url(#plx-glow)"/>
-    ${pill(530, 216, ['Natural recovery', 'slows down'], { to: [540, 165] })}
-    ${pill(540, 98, 'With therapy', { to: [580, 128], color: C.mint, lead: C.mint })}
-    ${T(606, 322, 'Time →', { anchor: 'end', color: C.soft })}
-    ${T(346, 205, 'Recovery', { anchor: 'middle', color: C.soft, extra: 'transform="rotate(-90 346 205)"' })}
-  </g>`;
+function drawAge(g, grow) {
+  const x0 = 34, x1 = g.w - 16, y0 = g.h - 40, y1 = 20;
+  axes(g, x0, y0, x1, y1);
+  const pts = [];
+  for (let i = 0; i <= 100 * grow; i++) { const t = i / 100; pts.push([x0 + 4 + t * (x1 - x0 - 8), y0 - (0.2 + 0.72 * Math.exp(-t * 3.2)) * (y0 - y1)]); }
+  if (pts.length > 1) g.glowLine(pts, C.amber, 3.5);
+  [['Child', 0.1], ['Adult', 0.5], ['Older', 0.9]].forEach(([l, t]) => g.text(x0 + t * (x1 - x0), y0 + 18, l, { align: 'center', color: C.soft }));
+  g.text(16, (y0 + y1) / 2, 'Plasticity', { align: 'center', color: C.soft, rotate: -Math.PI / 2 });
+  if (grow >= 1) g.pill(x0 + 0.62 * (x1 - x0), y0 - 0.62 * (y0 - y1), ['Reduces, but', 'never stops'], { color: C.amber, to: [x0 + 0.85 * (x1 - x0), y0 - 0.25 * (y0 - y1)] });
+}
+function drawRecoveryEval(g, grow) {
+  const half = g.h * 0.5;
+  g.text(12, 12, 'Cognitive reserve: Schneider et al. (2014)', { weight: 700 });
+  g.text(12, 34, 'Disability-free recovery 1 year after brain injury', { color: C.soft });
+  // published percentages (Schneider et al., 2014, Neurology), by years of education
+  const DATA = [['Under 12', 9.7, '#7186B8'], ['12–15', 30.8, '#B7A6D8'], ['16 or more', 39.2, C.amber]];
+  const by0 = half - 46, top = 62, bh = by0 - top - 22;
+  const n = DATA.length, gap = Math.min(40, g.w * 0.06), bw = Math.min(100, (g.w - 40 - gap * (n - 1)) / n);
+  const x0b = (g.w - (bw * n + gap * (n - 1))) / 2;
+  g.line([[12, by0], [g.w - 12, by0]], C.soft, 1.5);
+  DATA.forEach(([lab, v, col], i) => {
+    const x = x0b + i * (bw + gap), hgt = bh * (v / 45) * grow;
+    g.rect(x, by0 - hgt, bw, hgt, col);
+    if (grow >= 1) g.text(x + bw / 2, by0 - hgt - 12, `${v}%`, { align: 'center', weight: 700 });
+    g.text(x + bw / 2, by0 + 16, lab, { align: 'center', weight: i === n - 1 ? 700 : 400 });
+  });
+  g.text(g.w / 2, by0 + 36, 'Years of education', { align: 'center', color: C.soft });
+  // rehab curve
+  const x0 = 30, x1 = g.w - 16, y0 = g.h - 34, y1 = half + 40;
+  g.text(12, half + 12, 'Rehabilitation over time (illustrative)', { weight: 700 });
+  axes(g, x0, y0, x1, y1);
+  const nat = [], ther = [];
+  for (let i = 0; i <= 100 * grow; i++) {
+    const t = i / 100, x = x0 + t * (x1 - x0);
+    nat.push([x, y0 - (1 - Math.exp(-t * 6)) * 0.62 * (y0 - y1)]);
+    if (t >= 0.35) ther.push([x, y0 - ((1 - Math.exp(-t * 6)) * 0.62 + 0.55 * (t - 0.35)) * (y0 - y1)]);
+  }
+  if (nat.length > 1) g.line(nat, '#9DB3E8', 3);
+  if (ther.length > 1) g.glowLine(ther, C.mint, 3);
+  if (grow >= 1) {
+    g.pill(x0 + 0.72 * (x1 - x0), y0 - 0.32 * (y0 - y1), 'Natural recovery slows', { to: [x0 + 0.72 * (x1 - x0), y0 - 0.6 * (y0 - y1)] });
+    g.pill(x0 + 0.5 * (x1 - x0), y1 + 6, 'With therapy', { color: C.mint, to: [x0 + 0.8 * (x1 - x0), y0 - 0.85 * (y0 - y1)] });
+  }
+  g.text(x1, y0 + 18, 'Time →', { align: 'right', color: C.soft });
 }
 
-const CSS = `
-.plx { position:absolute; inset:0; display:flex; flex-direction:column; }
-.lesson-visual .plx .vis-controls { position:static; padding:12px 12px 0; margin:0; min-height:56px; }
-.plx .plx-svg { flex:1 1 0; min-height:0; width:100%; height:100%; }
-.lesson-visual .plx .vis-caption { position:static; margin:0; padding:4px 16px 14px; max-width:none; min-height:2.9em; }
-.plx [data-scene] { animation: plx-in .5s ease both; }
-@keyframes plx-in { from { opacity:0; } }
-.plx .plx-edge { stroke-linecap:round; transition: stroke-width .7s ease, stroke .7s ease, opacity .7s ease; }
-.plx .plx-pathglow { opacity:0; transition: opacity .6s ease; }
-.plx .plx-pathglow.on { opacity:.13; }
-.plx .plx-core { transition: fill .35s ease; }
-.plx .plx-node.on .plx-core { fill:${C.amber}; }
-.plx .plx-pill { transition: opacity .5s ease; }
-.plx .plx-pill.off { opacity:0; pointer-events:none; }
-.plx .plx-bar { transform-box: fill-box; transform-origin: 50% 100%; transition: transform 1.1s cubic-bezier(.2,.7,.2,1); }
-.plx .plx-bar.low { transform: scaleY(0); transition:none; }
-.plx .plx-dzone, .plx .plx-bspot, .plx .plx-x, .plx .plx-rl-dmg { opacity:0; transition: opacity .9s ease; }
-.plx .plx-damaged .plx-dzone, .plx .plx-damaged .plx-bspot, .plx .plx-damaged .plx-x { opacity:1; }
-.plx .plx-broken { transition: stroke .9s ease, opacity .9s ease; }
-.plx .plx-damaged .plx-broken { stroke:${C.red}; opacity:.5; stroke-dasharray:4 6; }
-.plx .plx-dnode > circle { transition: opacity .9s ease; }
-.plx .plx-damaged .plx-dnode > circle { opacity:.3; }
-.plx .plx-homo { opacity:0; transition: opacity 1.2s ease; }
-.plx .plx-m-homo.on .plx-homo { opacity:.85; }
-.plx .plx-halo { opacity:0; transform-box: fill-box; transform-origin:center; transform: scale(.55); transition: opacity 1s ease, transform 1.2s ease; }
-.plx .plx-m-halo.on .plx-halo { opacity:1; transform: scale(1); }
-.plx .plx-r-brain, .plx .plx-r-inset, .plx .plx-m-unmask, .plx .plx-m-sprout, .plx .plx-m-vessel, .plx .plx-m-halo { transition: opacity .5s ease; }
-:root[data-calm="true"] .plx .glow { filter:none; }
-@media (prefers-reduced-motion: reduce) { :root:not([data-motion="full"]) .plx * { transition:none !important; animation:none !important; } }
-`;
-
-const SVG = `<svg class="diagram plx-svg" viewBox="0 0 640 380" role="img" aria-label="">
-  <defs>
-    <filter id="plx-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <pattern id="plx-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="rgba(255,138,122,.12)"/><line x1="0" y1="0" x2="0" y2="8" stroke="rgba(255,138,122,.6)" stroke-width="2"/></pattern>
-    <clipPath id="plx-inset-clip"><circle cx="${IC[0]}" cy="${IC[1]}" r="139"/></clipPath>
-    <marker id="plx-arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="${C.violet}"/></marker>
-  </defs>
-  ${netSVG()}${maguireSVG()}${studiesSVG()}${recoverySVG()}${evalASVG()}${evalBSVG()}
-</svg>`;
-
-// Per-step caption (visible) and fuller description (for screen readers).
+/* ------------------------------------------------------------------ captions [visible, screen-reader] */
 const CAPTIONS = [
-  ['Learning can make a new connection between neurons.', 'A network of neurons. A new connection grows between two neurons, labelled: new connection forms through learning.'],
-  ['Press Practise, then Let time pass. Watch which connections stay.', 'An interactive network of neurons. Practising strengthens one pathway. Letting time pass weakens connections that were not used, until some are pruned.'],
-  ['Taxi drivers had a larger posterior hippocampus. Bars are illustrative.', 'Side view of the brain with the hippocampus highlighted, its back part marked larger in taxi drivers. Illustrative bars: taxi drivers higher than controls. Illustrative dots: more years as a driver goes with a larger posterior hippocampus.'],
-  ['Video games and meditation are also linked to brain changes. Waves are illustrative.', 'Left: brain with the prefrontal cortex, hippocampus and cerebellum marked, where Kühn et al. found more grey matter. Right: illustrative gamma waves, small for students and larger for Buddhist monks.'],
-  ['Press “Damage this area” to see a stroke damage a small area.', 'Top view of the brain and a zoomed-in circle of neurons. A small area of the left hemisphere can be damaged with the button.'],
-  ['Neuronal unmasking: dormant synapses become active.', 'Zoomed-in neurons next to a damaged area. Grey dashed dormant synapses turn into bright active connections.'],
-  ['Axonal sprouting: new nerve endings grow around the damage.', 'Zoomed-in neurons next to a damaged area. New green branches grow from healthy neurons to other healthy neurons.'],
-  ['Homologous area: the matching area in the right hemisphere helps.', 'Top view of the brain. An arrow goes from the damaged area in the left hemisphere to the matching area in the right hemisphere, which lights up.'],
-  ['New blood vessels form, and neurons become more sensitive.', 'Zoomed-in neurons. New blood vessels grow towards the damaged area, and rings appear around neurons that lost input, showing they are more sensitive.'],
-  ['Evaluating plasticity: age and negative plasticity. Graph is illustrative.', 'Left: an illustrative curve showing plasticity is highest in childhood and reduces with age but never reaches zero. Right: a phantom limb drawing, the missing part still felt.'],
-  ['Evaluating recovery: cognitive reserve and rehabilitation. Graphs are illustrative.', 'Left: illustrative bars, more years of education linked to a higher chance of disability-free recovery. Right: illustrative curve, natural recovery slows down, and therapy helps it continue.'],
+  ['Learning can make a new connection between neurons. (A 3D model, not real data.)', 'A 3D model of a network of neurons. A new connection grows between two neurons, labelled: new connection forms through learning.'],
+  ['Press Practise, then Let time pass. Watch which connections stay. (A 3D model.)', 'An interactive 3D model of a network of neurons. Practising strengthens one pathway, which gets thicker and glows. Letting time pass weakens connections that were not used, until some are pruned.'],
+  ['Taxi drivers had more grey matter in the posterior hippocampus. Charts are illustrative.', 'A see-through 3D brain with the real hippocampus inside. Its back (posterior) part glows on both sides. Illustrative bars: taxi drivers higher than controls. Illustrative dots: more years as a driver goes with a larger posterior hippocampus.'],
+  ['Lit areas: more grey matter after video-game training (Kühn et al., 2014). Graph: gamma waves in meditation (Davidson et al., 2004). Waves are illustrative.', 'A see-through 3D brain with the right hippocampus, the cerebellum and an approximate right prefrontal area lit up, where Kühn et al. found more grey matter. Beside it, illustrative gamma waves: small for students, larger for Buddhist monks.'],
+  ['Press “Damage this area” to see a stroke damage Broca’s area.', 'A 3D brain seen from the left. A button damages Broca’s area, on the left frontal lobe, shown as dark damaged tissue.'],
+  ['Neuronal unmasking: dormant synapses become active. (A 3D model.)', 'A zoomed-in 3D model of neurons next to the damaged area. Thin grey dormant connections become bright, active connections.'],
+  ['Axonal sprouting: new nerve endings grow around the damage. (A 3D model.)', 'A zoomed-in 3D model of neurons next to the damaged area. New green branches grow from healthy neurons to other healthy neurons.'],
+  ['Homologous area: the matching area in the right hemisphere helps. Position approximate.', 'A 3D brain seen from the front. Broca’s area on the left is damaged. The matching area on the right hemisphere lights up, with an arrow across from the damaged side.'],
+  ['New blood vessels form, and neurons become more sensitive. (A 3D model.)', 'A zoomed-in 3D model of neurons. New blood vessels grow towards the damaged area, and glowing rings appear around neurons that lost input, showing they are more sensitive.'],
+  ['Evaluating plasticity: age and negative plasticity. Graph is illustrative.', 'A 3D brain with the somatosensory cortex lit up, linked to phantom limb sensations. Beside it, an illustrative curve: plasticity is highest in childhood and reduces with age but never reaches zero.'],
+  ['Evaluating recovery: cognitive reserve (Schneider et al., 2014) and rehabilitation. The therapy curve is illustrative.', 'Bars from Schneider et al. (2014): disability-free recovery one year after brain injury was 9.7% with under 12 years of education, 30.8% with 12 to 15 years and 39.2% with 16 or more years. Illustrative curve: natural recovery slows down, and therapy helps it continue. Behind, the 3D brain with the damaged area and the helping area on the other side.'],
 ];
+const INTRO = ['Neurons connect to each other at synapses, forming networks. (A 3D model.)', 'A 3D model of a network of neurons joined by connections of different strengths.'];
 
-/* ------------------------------------------------------------------ the lesson */
+/* ------------------------------------------------------------------ the visual */
+const VISUAL = {
+  dark: true,
+  async create(container) {
+    const S = createStage(container, 'plx3');
+    const show = { brain: true, net: false, inset: false };
+    const rm = () => reducedMotion();
+    // ---- 3D brain (real data)
+    const viewer = new BrainViewer(S.gl, { label: '3D brain for this step' });
+    // ---- 3D network (model)
+    const net = new NetScene(S.gl2, { label: '3D model of connected neurons' });
+    await viewer.ready;
+    quietPicking(viewer);
+    const freeRect = freeRectFor(S);
+    installViewShift(viewer, () => (show.inset ? null : freeRect()));
+    viewer.setReal(true);
+    viewer.model.updateMatrixWorld(true);
+    const W = (p) => toWorld(viewer, p);
+    const cam = viewer.camera;
+    const projBrain = (p) => { const q = viewer.project(p); return q && { x: q.x + S.gl.offsetLeft, y: q.y + S.gl.offsetTop }; };
+    const projNet = (p) => net.project(p);
+    const labB = createLabels(S, projBrain, freeRect);
+    const labN = createLabels(S, projNet, () => {
+      const Wd = S.root.clientWidth, Hd = S.root.clientHeight;
+      return show.inset ? { x: 0, y: 58, w: Wd - S.gl.offsetWidth - 30, h: Hd - 128 } : { x: 0, y: 58, w: Wd, h: Hd - 128 };
+    });
+    const chipsB = createChips(S, projBrain);
+    const panel = createPanel(S, 'side');
+    const facing = (pModel, n) => { const nv = new THREE.Vector3(...n).normalize(); return () => nv.dot(cam.position.clone().sub(W(pModel))) > 0; };
+    const brainC = viewer.center.clone();
+
+    // ---- anchors on the real brain (model space)
+    const P = {
+      broca: regionCentre(viewer, 5, 'left'),
+      dlpfcR: snapToRegion(viewer, fromRAS(38, 34, 32), 0, 'right'),       // approximate right DLPFC (middle frontal gyrus)
+      s1L: regionCentre(viewer, 2, 'left'),
+    };
+    // the homologous area: Broca's area mirrored, vertex by vertex, onto the right hemisphere
+    P.brocaR = mirrorRegionMask(viewer, 5) || snapToRegion(viewer, new THREE.Vector3(-P.broca.x, P.broca.y, P.broca.z), 0, 'right');
+    const centreOf = (name) => { const o = viewer.meshes[name]; o.updateMatrix(); o.geometry.computeBoundingBox(); return o.geometry.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(o.matrix); };
+    P.hippoR = centreOf('hippocampus_right'); P.cblL = centreOf('cerebellum_left'); P.cblR = centreOf('cerebellum_right');
+
+    const lesion = cortexLayer(viewer, { hemis: ['left'], lobes: ['frontal'], style: 'lesion', region: 5, regionAdd: 1, thresh: 0.5, colors: ['#2E0B09', '#7A2618'], opacity: 0.97 });
+    const homo = cortexLayer(viewer, { hemis: ['right'], style: 'glow', maskW: 1, thresh: 0.4, colors: ['#C9AAFF'], opacity: 0.92 });
+    const dlpfc = cortexLayer(viewer, { hemis: ['right'], lobes: ['frontal'], style: 'glow', seeds: [{ p: P.dlpfcR, sigma: 11, w: 1 }], thresh: 0.35, colors: ['#FFC965'], opacity: 0.9 });
+    const s1 = cortexLayer(viewer, { style: 'glow', region: 2, regionAdd: 1, thresh: 0.4, colors: ['#C9AAFF'], opacity: 0.85 });
+    const hippoL = splitLongAxis(viewer, 'hippocampus_left', 0.3), hippoR = splitLongAxis(viewer, 'hippocampus_right', 0.3);
+    // arc from the damaged area to the matching area (over the top of the brain)
+    const arcCurve = new THREE.CatmullRomCurve3([P.broca.clone().add(new THREE.Vector3(6, 4, 0)), new THREE.Vector3(brainC.x + 32, P.broca.y + 46, P.broca.z + 30), new THREE.Vector3(brainC.x - 32, P.broca.y + 46, P.broca.z + 30), P.brocaR.clone().add(new THREE.Vector3(-6, 4, 0))]);
+    const arcGeo = new THREE.TubeGeometry(arcCurve, 120, 1.4, 10, false);
+    const arc = new THREE.Mesh(arcGeo, new THREE.MeshBasicMaterial({ color: '#C9AAFF', transparent: true, opacity: 0.95 }));
+    const arrowHead = new THREE.Mesh(new THREE.ConeGeometry(4, 10, 20), arc.material);
+    arrowHead.position.copy(arcCurve.getPointAt(1));
+    arrowHead.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), arcCurve.getTangentAt(1).normalize());
+    arc.raycast = arrowHead.raycast = () => {};
+    arc.visible = arrowHead.visible = false;
+    viewer.model.add(arc, arrowHead);
+    const setArc = (p) => { arcGeo.setDrawRange(0, Math.floor((arcGeo.index.count / 6) * p) * 6); arc.visible = p > 0.001; arrowHead.visible = p >= 0.999; };
+
+    // ---- animation bookkeeping
+    const cancels = new Set();
+    const stopAll = () => { cancels.forEach((c) => c()); cancels.clear(); };
+    const run = (dur, fn, done, delay = 0) => {
+      if (rm()) { fn(1); done?.(); return; }
+      let raf = 0, t0 = 0;
+      const fr = (now) => { if (!t0) t0 = now + delay; const p = Math.max(0, Math.min(1, (now - t0) / dur)); fn(p); if (p < 1) raf = requestAnimationFrame(fr); else { cancels.delete(cancel); done?.(); } };
+      const cancel = () => cancelAnimationFrame(raf);
+      cancels.add(cancel); raf = requestAnimationFrame(fr);
+    };
+    const ease = (p) => (p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2);
+    const ctl = (defs, label) => setControls(S.ctrl, defs, label);
+    const cap = (t) => { S.cap.textContent = t; };
+    let instant = true, building = false, pendingFly = null;
+    const fly = (target, dir, dist) => { if (building) pendingFly = [target, dir, dist]; else flyTo(viewer, target, dir, dist, instant || rm()); };
+
+    // =========================================================== learning network
+    const learn = new THREE.Group(); net.root.add(learn);
+    const nodes = Object.fromEntries(Object.keys(NODES).map((k, i) => [k, net.neuron(node3(k), { radius: PATH.includes(k) ? 6.5 : 5.5, seed: 11 + i * 7, parent: learn })]));
+    const edges = EDGES.map(([u, v, s0, onPath], i) => {
+      const L = net.link(nodes[u], nodes[v], { seed: 101 + i * 13, bend: 0.18, parent: learn });
+      return { key: `${u}-${v}`, s0, s: s0, shown: s0, onPath: !!onPath, L };
+    });
+    const pulseDot = net.pulseDot('#FFE2A0', 2.6);
+    const used = new Set();
+    let practised = 0, waited = 0, weakenedPath = false;
+    const styleEdge = (e, sVal = e.s) => {
+      const s = Math.max(0, Math.min(5, sVal));
+      const fl = Math.floor(s), fr = s - fl;
+      const rad = RADIUS[fl] + (RADIUS[Math.min(5, fl + 1)] - RADIUS[fl]) * fr;
+      e.L.setRadius(rad);
+      const strong = s >= 3.5;
+      const col = new THREE.Color(C.link).lerp(new THREE.Color(C.amber), THREE.MathUtils.clamp((s - 3) / 1.2, 0, 1));
+      e.L.setColor(col, strong ? 0.42 : 0.12 + 0.06 * s);
+      e.L.setOpacity(s < 0.5 ? 0.12 + 0.3 * s : 0.55 + 0.09 * s);
+    };
+    const restyle = (animate) => {
+      edges.forEach((e) => {
+        const from = e.shown, to = e.s;
+        if (!animate || rm() || from === to) { e.shown = to; styleEdge(e); return; }
+        run(700, (p) => { e.shown = from + (to - from) * ease(p); styleEdge(e, e.shown); });
+      });
+    };
+    const resetNet = () => { edges.forEach((e) => { e.s = e.s0; e.shown = e.s0; styleEdge(e); e.L.setGrow(1); }); used.clear(); practised = 0; waited = 0; weakenedPath = false; };
+    const pulse = () => {
+      const nodeEls = PATH.map((k) => nodes[k]);
+      const pathEdges = PATH.slice(0, -1).map((k, i) => edges.find((e) => e.key === `${k}-${PATH[i + 1]}`));
+      if (rm()) { nodeEls.forEach((n) => n.setActive(1)); setTimeout(() => nodeEls.forEach((n) => n.setActive(0)), 900); return; }
+      pulseDot.visible = true;
+      run(2200, (p) => {
+        const seg = Math.min(pathEdges.length - 1, Math.floor(p * pathEdges.length));
+        const f = p * pathEdges.length - seg;
+        pulseDot.position.copy(pathEdges[seg].L.curve.getPointAt(Math.min(1, f)));
+        nodeEls.forEach((n, i) => n.setActive(Math.max(0, 1 - Math.abs(p * pathEdges.length - i) * 2.2)));
+      }, () => { pulseDot.visible = false; nodeEls.forEach((n) => n.setActive(0)); });
+    };
+    const strongLabelEdge = () => edges.find((e) => e.key === 'b-c');
+    const netLabels = () => {
+      const out = [];
+      if (practised === 0 && waited === 0) out.push({ id: 'path', html: 'Pathway you practise', color: C.amber, anchor: () => nodes.a.pos, dx: 40, dy: -120 });
+      if (edges.some((e) => e.onPath && e.s >= 4)) out.push({ id: 'strong', html: 'Stronger with use<small>thicker, brighter connection</small>', color: C.amber, anchor: () => strongLabelEdge().L.curve.getPointAt(0.5), dx: 30, dy: -130 });
+      if (weakenedPath && !edges.some((e) => e.onPath && e.s >= 4)) out.push({ id: 'weak', html: 'Not practised, so getting weaker', color: C.soft, anchor: () => strongLabelEdge().L.curve.getPointAt(0.5), dx: 30, dy: -130 });
+      const pruned = edges.find((e) => e.s === 0);
+      if (pruned) out.push({ id: 'pruned', html: 'Not used, so pruned', color: C.rose, anchor: () => pruned.L.curve.getPointAt(0.5), dx: 0, dy: 120 });
+      labN.set(out);
+      S.status.textContent = `Practised ${practised} ${practised === 1 ? 'time' : 'times'} · Time passed ${waited} ${waited === 1 ? 'time' : 'times'}`;
+    };
+    const practise = () => {
+      practised++;
+      edges.filter((e) => e.onPath).forEach((e) => { e.s = Math.min(5, e.s + 1); used.add(e.key); });
+      restyle(true); pulse(); netLabels();
+      cap('Practising sends signals along the same pathway, so those connections get stronger.');
+    };
+    const letTimePass = () => {
+      waited++;
+      edges.forEach((e) => { if (!used.has(e.key) && e.s > 0) { e.s -= 1; if (e.onPath) weakenedPath = true; } });
+      used.clear(); restyle(true); netLabels();
+      cap(edges.some((e) => e.s === 0) ? 'Connections that were not used got weaker. Some have been pruned (removed).' : 'Time passed. Connections that were not used got weaker.');
+    };
+    S.status = document.createElement('p');
+    S.status.className = 'plx3-status';
+    S.root.append(S.status);
+
+    // =========================================================== recovery micro-network
+    const rec = new THREE.Group(); net.root.add(rec);
+    const rnodes = Object.fromEntries(Object.keys(RN).map((k, i) => [k, net.neuron(rn3(k), { radius: 7, seed: 300 + i * 17, parent: rec })]));
+    const mk = (pairs, color, seed) => pairs.map(([u, v], i) => net.link(rnodes[u], rnodes[v], { seed: seed + i * 11, bend: 0.22, color, parent: rec, segs: 72 }));
+    const broken = mk(R_BROKEN, C.link, 500);
+    const healthy = mk(R_HEALTHY, C.link, 600);
+    const dormant = mk(R_DORMANT, '#56607A', 700);
+    const sprouts = mk(R_SPROUT, C.mint, 800);
+    healthy.forEach((l) => { l.setRadius(1.4); l.setColor(C.link, 0.2); });
+    // damaged tissue: a soft dark-red cloud around the dead neurons
+    const dz = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 28), new THREE.MeshPhysicalMaterial({ color: '#7A1E22', transparent: true, opacity: 0.28, roughness: 0.6, depthWrite: false, emissive: new THREE.Color('#3A0608'), emissiveIntensity: 0.4 }));
+    dz.scale.set(62, 96, 52); dz.position.set((100 - 175) * 1.2, -(195 - 200) * 1.2, 6);
+    rec.add(dz);
+    const vOld = net.vessel([new THREE.Vector3(-40, -150, -20), new THREE.Vector3(30, -150, -10), new THREE.Vector3(105, -115, -14), new THREE.Vector3(150, -55, -18)], { radius: 4.2, parent: rec });
+    const vNew = [
+      net.vessel([new THREE.Vector3(-4, -151, -18), new THREE.Vector3(-18, -110, -8), new THREE.Vector3(-34, -78, 4), new THREE.Vector3(-58, -60, 10)], { radius: 2.6, parent: rec }),
+      net.vessel([new THREE.Vector3(76, -132, -14), new THREE.Vector3(60, -96, -6), new THREE.Vector3(36, -76, 2), new THREE.Vector3(8, -70, 8)], { radius: 2.4, parent: rec }),
+    ];
+    const halos = HALOS.map((k) => net.halo(rnodes[k]));
+    let halosOn = 0;
+    net.on('frame', () => {
+      // halos are static (a pulsing glow would read as the neuron firing)
+      if (halosOn > 0) halos.forEach((h) => h.set(halosOn, 0, net.camera));
+      labN.update();
+    });
+    const setDamage = (on) => {
+      ['d1', 'd2', 'd3'].forEach((k) => rnodes[k].setDead(on));
+      broken.forEach((l) => { l.setColor(on ? '#B5444C' : C.link, on ? 0.1 : 0.2); l.setRadius(on ? 0.9 : 1.4); l.setOpacity(on ? 0.45 : 0.9); l.setGrow(on ? 0.55 : 1); });
+      dz.visible = on;
+    };
+    const setUnmask = (p) => dormant.forEach((l) => {
+      l.setRadius(0.55 + 1.35 * p);
+      l.setColor(new THREE.Color('#56607A').lerp(new THREE.Color('#2FC4FF'), p), 0.1 + 1.0 * p);
+      l.setOpacity(0.45 + 0.5 * p);
+    });
+    const setSprout = (p, i = null) => sprouts.forEach((l, k) => { l.setRadius(1.2); l.setColor(C.mint, 0.7); l.setOpacity(p > 0 ? 1 : 0); if (i === null || i === k) l.setGrow(p); });
+    const setVessels = (p) => vNew.forEach((v) => v.setGrow(p));
+    const setHalos = (o) => { halosOn = o; halos.forEach((h) => h.set(o, 0, net.camera)); };
+
+    // =========================================================== modes
+    const setMode = (mode) => {
+      // 'brain' = brain full stage; 'net' = network full stage; 'inset' = network + small brain in a corner
+      show.brain = mode !== 'net'; show.net = mode !== 'brain'; show.inset = mode === 'inset';
+      S.gl.hidden = !show.brain; S.gl2.hidden = !show.net;
+      S.gl.classList.toggle('bx3-inset', show.inset);
+      setViewerRunning(viewer, show.brain);
+      net.setRunning(show.net);
+      learn.visible = false; rec.visible = false;
+    };
+    viewer.on('frame', () => { labB.update(); chipsB.update(); });
+
+    const resetAll = () => {
+      stopAll();
+      labB.clear(); labN.clear(); chipsB.set([]); panel.hide();
+      S.status.textContent = '';
+      lesion.setVisible(false); homo.setVisible(false); dlpfc.setVisible(false); s1.setVisible(false);
+      lesion.level = 1; homo.level = 1;
+      hippoL.show(false); hippoR.show(false);
+      setArc(0);
+      viewer.setXray(false); viewer.select(null, { fly: false }); viewer.setMode('lobes');
+      ctl([]);
+    };
+    let damaged = false;
+
+    const STEPS = {
+      [-1]: () => {
+        setMode('net'); learn.visible = true; resetNet();
+        edges.find((e) => e.key === NEW_EDGE).L.setOpacity(0);
+        net.view(new THREE.Vector3(8, -4, 0), [0.25, 0.25, 1], 510, instant);
+        cap(INTRO[0]); return INTRO[1];
+      },
+      0: () => {
+        setMode('net'); learn.visible = true; resetNet();
+        const ne = edges.find((e) => e.key === NEW_EDGE);
+        const grow = () => {
+          stopAll();
+          ne.L.setRadius(1.7); ne.L.setColor(C.mint, 0.9); ne.L.setOpacity(1); ne.L.setGrow(0);
+          run(1800, (p) => ne.L.setGrow(ease(p)), null, 300);
+        };
+        labN.set([{ id: 'new', html: 'New connection<small>forms through learning</small>', color: C.mint, anchor: () => ne.L.curve.getPointAt(0.55), dx: 120, dy: 110 }]);
+        net.view(new THREE.Vector3(-40, 0, 0), [0.15, 0.2, 1], 380, instant);
+        if (instant || rm()) { ne.L.setRadius(1.7); ne.L.setColor(C.mint, 0.9); ne.L.setOpacity(1); ne.L.setGrow(1); } else grow();
+        ctl([{ label: '↻ Play again', onClick: grow }]);
+        cap(CAPTIONS[0][0]);
+      },
+      1: () => {
+        setMode('net'); learn.visible = true;
+        edges.forEach((e) => { e.L.setGrow(1); styleEdge(e); });
+        net.view(new THREE.Vector3(8, -4, 0), [0.25, 0.25, 1], 510, instant);
+        ctl([
+          { label: 'Practise', onClick: practise },
+          { label: 'Let time pass', onClick: letTimePass },
+          { label: '↺ Start again', onClick: () => { resetNet(); netLabels(); cap(CAPTIONS[1][0]); } },
+        ]);
+        netLabels();
+        cap(CAPTIONS[1][0]);
+      },
+      2: () => {
+        setMode('brain');
+        viewer.setXray(true);
+        hippoL.show(true); hippoR.show(true);
+        styleStructures(viewer, { dim: /^(?!hippocampus)/, dimOpacity: 0.07 });
+        fly(brainC, [1, 0.45, -0.25], 330);
+        labB.set([
+          { id: 'post', html: 'Posterior (back) hippocampus<small>more grey matter in taxi drivers (boundary approximate)</small>', color: '#FFC23D', anchor: () => W(hippoL.backCentre), dx: -40, dy: -150 },
+          { id: 'ant', html: 'Front part', color: '#8FA3C8', anchor: () => W(hippoL.frontCentre), dx: 60, dy: 120 },
+        ]);
+        let grow = instant || rm() ? 1 : 0;
+        panel.show({ cls: 'side', title: 'Maguire et al. (2000)', sub: 'Illustrative, not real data', draw: (g) => drawMaguire(g, grow), aria: 'Illustrative bars: taxi drivers have more posterior hippocampus grey matter than controls. Illustrative dots: more years as a driver, larger posterior hippocampus.' });
+        const play = () => { stopAll(); run(1400, (p) => { grow = ease(p); panel.redraw(); }); };
+        if (grow < 1) play();
+        ctl([{ label: '↻ Play again', onClick: play }]);
+        cap(CAPTIONS[2][0]);
+      },
+      3: () => {
+        setMode('brain');
+        viewer.setXray(true);
+        styleStructures(viewer, { glow: { hippocampus_right: '#F2A93B', cerebellum_left: '#F2A93B', cerebellum_right: '#F2A93B' }, dim: /^(?!hippocampus_right|cerebellum)/, dimOpacity: 0.07 });
+        dlpfc.setVisible(true);
+        fly(brainC, [-1, 0.3, 0.35], 420);
+        labB.set([
+          { id: 'pfc', html: 'Prefrontal cortex<small>right side (approximate). Kühn et al.: more grey matter</small>', color: C.amber, anchor: () => W(P.dlpfcR), dx: 40, dy: -130 },
+          { id: 'hip', html: 'Hippocampus<small>right side</small>', color: C.amber, anchor: () => W(P.hippoR), dx: 120, dy: 60 },
+          { id: 'cbl', html: 'Cerebellum', color: C.amber, anchor: () => W(P.cblR), dx: -110, dy: 90 },
+        ]);
+        panel.show({ cls: 'side', title: 'Davidson et al. (2004)', sub: 'Gamma waves during meditation (illustrative)', draw: drawDavidson, aria: 'Illustrative EEG gamma waves: small for students new to meditation, much larger for Buddhist monks.' });
+        cap(CAPTIONS[3][0]);
+      },
+      4: () => {
+        setMode('brain');
+        fly(brainC, [1, 0.12, 0.25], 420);
+        const apply = (on, animate) => {
+          damaged = on;
+          lesion.setVisible(on);
+          if (on && animate) run(1200, (p) => { lesion.level = 0.5 + 0.5 * ease(p); }); else lesion.level = 1;
+          labB.set(on ? [{ id: 'dmg', html: 'Damage<small>e.g. a stroke in Broca’s area</small>', color: C.red, anchor: () => W(P.broca), facing: facing(P.broca, [1, 0, 0.3]), dx: -30, dy: 150 }]
+            : [{ id: 'b', html: 'Broca’s area<small>left frontal lobe</small>', color: C.soft, anchor: () => W(P.broca), facing: facing(P.broca, [1, 0, 0.3]), dx: -30, dy: 150 }]);
+          ctl([{ label: on ? '↺ Undo the damage' : 'Damage this area', onClick: () => apply(!damaged, true) }]);
+          cap(on ? 'Broca’s area is damaged. Nearby neurons have lost some of their connections.' : CAPTIONS[4][0]);
+        };
+        apply(damaged, false);
+      },
+      micro: (step) => {
+        setMode('inset'); rec.visible = true;
+        // the small brain shows where we are zoomed in
+        lesion.setVisible(true); lesion.level = 1;
+        flyTo(viewer, P.broca, [1, 0.15, 0.3], 260, true);
+        chipsB.set([{ text: 'Zoomed in here', color: C.red, anchor: () => W(P.broca) }]);
+        setDamage(true);
+        net.view(new THREE.Vector3(60, -5, 0), [0.2, 0.15, 1], 700, instant);
+        const dmgLab = { id: 'dz', html: 'Damaged area<small>these neurons have died</small>', color: C.red, anchor: () => dz.position, dx: -30, dy: 190 };
+        // state up to this step
+        setUnmask(step >= 6 ? 1 : 0);
+        setSprout(step >= 8 ? 1 : 0);
+        sprouts.forEach((l) => l.setOpacity(step >= 8 ? 0.85 : 0));
+        if (step >= 6) dormant.forEach((l) => l.setColor(C.cyan, 0.35));
+        setVessels(0); setHalos(0);
+        const play = () => {
+          stopAll();
+          if (step === 5) { setUnmask(0); run(1600, (p) => setUnmask(ease(p)), null, 300); }
+          if (step === 6) { setSprout(0); sprouts.forEach((l, i) => run(1800, (p) => l.setGrow(ease(p)), null, 300 + i * 450)); setSprout(0.0001); }
+          if (step === 8) { setVessels(0); setHalos(0); run(2200, (p) => setVessels(ease(p)), null, 200); run(1200, (p) => setHalos(p), null, 1400); }
+        };
+        if (step === 5) labN.set([dmgLab, { id: 'um', html: 'Dormant synapses switch on', color: C.cyan, anchor: () => dormant[0].curve.getPointAt(0.5), dx: 130, dy: -120 }]);
+        if (step === 6) labN.set([dmgLab, { id: 'sp', html: 'New nerve endings grow<small>between healthy neurons</small>', color: C.mint, anchor: () => sprouts[0].curve.getPointAt(0.6), dx: 140, dy: -120 }]);
+        if (step === 8) labN.set([dmgLab,
+          { id: 'v', html: 'New blood vessels form', color: C.rose, anchor: () => vNew[0].curve.getPointAt(0.6), dx: 150, dy: 70 },
+          { id: 'h', html: 'Neurons become more sensitive<small>they lost some input</small>', color: C.amber, anchor: () => rnodes.h6.pos, dx: 170, dy: -110 }]);
+        if (instant || rm()) {
+          if (step === 5) setUnmask(1);
+          if (step === 6) { setSprout(1); }
+          if (step === 8) { setVessels(1); setHalos(1); }
+        } else play();
+        ctl([{ label: '↻ Play again', onClick: play }]);
+        cap(CAPTIONS[step][0]);
+      },
+      7: () => {
+        setMode('brain');
+        lesion.setVisible(true); homo.setVisible(true);
+        fly(brainC, [-0.3, 0.15, 1], 420);
+        labB.set([
+          { id: 'l', html: 'Damaged area<small>left hemisphere</small>', color: C.red, anchor: () => W(P.broca), dx: 110, dy: 120 },
+          { id: 'r', html: 'Matching area on the right helps<small>position approximate</small>', color: C.violet, anchor: () => W(P.brocaR), dx: -110, dy: 120 },
+        ]);
+        const play = () => { stopAll(); homo.level = 0; setArc(0); run(1200, (p) => setArc(ease(p)), null, 200); run(1400, (p) => { homo.level = ease(p); }, null, 900); };
+        if (instant || rm()) { setArc(1); homo.level = 1; } else play();
+        ctl([{ label: '↻ Play again', onClick: play }]);
+        cap(CAPTIONS[7][0]);
+      },
+      9: () => {
+        setMode('brain');
+        s1.setVisible(true);
+        fly(brainC, [0.9, 0.9, -0.1], 430);
+        labB.set([{ id: 's1', html: 'Somatosensory cortex<small>changes here are linked to phantom limb sensations</small>', color: C.violet, anchor: () => W(P.s1L), dx: -60, dy: -140 }]);
+        let grow = instant || rm() ? 1 : 0;
+        panel.show({ cls: 'side', title: 'Age (illustrative)', sub: 'How plastic the brain is across life. <strong>Negative plasticity:</strong> many people who lose a limb still feel it (phantom limb).', draw: (g) => drawAge(g, grow), aria: 'Illustrative curve: plasticity is highest in childhood and reduces with age, but never stops.' });
+        const play = () => { stopAll(); run(1500, (p) => { grow = ease(p); panel.redraw(); }); };
+        if (grow < 1) play();
+        ctl([{ label: '↻ Play again', onClick: play }]);
+        cap(CAPTIONS[9][0]);
+      },
+      10: () => {
+        setMode('brain');
+        lesion.setVisible(true); homo.setVisible(true); setArc(1);
+        fly(brainC, [-0.3, 0.15, 1], 460);
+        let grow = instant || rm() ? 1 : 0;
+        panel.show({ cls: 'side wide', title: 'Evaluating functional recovery', sub: 'Bars: published values. Curve: illustrative.', draw: (g) => drawRecoveryEval(g, grow), aria: CAPTIONS[10][1] });
+        const play = () => { stopAll(); run(1600, (p) => { grow = ease(p); panel.redraw(); }); };
+        if (grow < 1) play();
+        ctl([{ label: '↻ Play again', onClick: play }]);
+        cap(CAPTIONS[10][0]);
+      },
+    };
+
+    let stepNow = -2;
+    return {
+      show(step) {
+        const moved = step !== stepNow;
+        stepNow = step;
+        instant = !moved;
+        resetAll();
+        const s = Math.max(-1, Math.min(10, step));
+        const fn = [5, 6, 8].includes(s) ? () => STEPS.micro(s) : STEPS[s];
+        building = true; pendingFly = null;
+        const aria = fn() || CAPTIONS[s]?.[1] || INTRO[1];
+        building = false;
+        if (pendingFly) flyTo(viewer, ...pendingFly, instant || rm());
+        S.root.setAttribute('aria-label', aria);
+        viewer.renderer.domElement.setAttribute('aria-label', aria);
+        net.renderer.domElement.setAttribute('aria-label', aria);
+        instant = false;
+      },
+      dispose() {
+        stopAll(); labB.dispose(); labN.dispose(); chipsB.dispose(); panel.dispose();
+        lesion.dispose(); homo.dispose(); dlpfc.dispose(); s1.dispose(); hippoL.dispose(); hippoR.dispose();
+        arcGeo.dispose(); arc.material.dispose(); arrowHead.geometry.dispose();
+        net.dispose(); viewer.dispose(); S.root.remove();
+      },
+    };
+  },
+};
+
+/* ------------------------------------------------------------------ the lesson (text fact-checked: keep) */
 export default {
   id: 'plasticity',
   title: 'Plasticity and functional recovery',
@@ -435,272 +657,5 @@ export default {
     'Evidence: Maguire et al. (2000) taxi drivers had more grey matter in the posterior hippocampus. Also Kühn et al. (2014) and Davidson et al. (2004).',
     'Recovery after trauma: neuronal unmasking, axonal sprouting, homologous areas, new blood vessels, denervation super-sensitivity.',
   ],
-  visual: {
-    dark: true,
-    async create(container) {
-      const root = document.createElement('div');
-      root.className = 'plx';
-      root.innerHTML = `<style>${CSS}</style><div class="vis-controls" role="group" aria-label="Diagram buttons"></div>${SVG}<p class="vis-caption" aria-live="polite"></p>`;
-      container.append(root);
-      const svg = root.querySelector('svg');
-      const ctrl = root.querySelector('.vis-controls');
-      const cap = root.querySelector('.vis-caption');
-      const $ = (s, r = svg) => r.querySelector(s);
-      const $$ = (s, r = svg) => [...r.querySelectorAll(s)];
-      const rm = () => reducedMotion();
-
-      // ---- animation bookkeeping (everything is cancelled on step change and dispose)
-      const timers = new Set();
-      let raf = 0;
-      const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); };
-      const stopAll = () => { timers.forEach(clearTimeout); timers.clear(); cancelAnimationFrame(raf); raf = 0; };
-
-      const grow = (p, animate, dur = 1200, delay = 0) => {
-        const len = p.getTotalLength() + 2;
-        p.style.transition = 'none';
-        p.style.strokeDasharray = `${len} ${len}`;
-        if (!animate || rm()) { p.style.strokeDashoffset = '0'; return; }
-        p.style.strokeDashoffset = `${len}`;
-        p.getBoundingClientRect();
-        p.style.transition = `stroke-dashoffset ${dur}ms ease ${delay}ms`;
-        p.style.strokeDashoffset = '0';
-      };
-      const ungrow = (p) => {
-        const len = p.getTotalLength() + 2;
-        p.style.transition = 'none';
-        p.style.strokeDasharray = `${len} ${len}`;
-        p.style.strokeDashoffset = `${len}`;
-      };
-      // Resize every label box to fit its text in the current font.
-      const fitPills = (scope) => {
-        $$('.plx-pill', scope).forEach((g) => {
-          const t = $('text', g), r = $('rect', g);
-          const b = t.getBBox();
-          if (!b.width) return;
-          r.setAttribute('x', b.x - 10); r.setAttribute('width', b.width + 20);
-          r.setAttribute('y', b.y - 6); r.setAttribute('height', b.height + 12);
-        });
-      };
-      const showPill = (el, on) => el.classList.toggle('off', !on);
-
-      // ---- controls
-      const setControls = (defs) => {
-        ctrl.replaceChildren(...defs.map((d) => {
-          const b = document.createElement('button');
-          b.type = 'button'; b.textContent = d.label;
-          if (d.id) b.dataset.id = d.id;
-          b.addEventListener('click', d.onClick);
-          return b;
-        }));
-      };
-
-      // ================= network state
-      const edges = EDGES.map(([u, v, s, onPath]) => ({ key: `${u}-${v}`, s0: s, s, onPath: !!onPath, el: $(`[data-e="${u}-${v}"]`) }));
-      const used = new Set();
-      let practised = 0, waited = 0, weakenedPath = false;
-      const statusEl = $('.plx-status');
-      const styleEdge = (e) => {
-        const s = e.s, el = e.el;
-        el.style.transition = '';
-        el.style.strokeWidth = s === 0 ? '1.5' : String(1.2 + s * 1.5);
-        el.style.stroke = s >= 4 ? C.amber : s === 0 ? C.faint : C.link;
-        el.style.opacity = s === 0 ? '0.35' : String(0.3 + s * 0.14);
-        el.style.strokeDasharray = s === 0 ? '3 7' : 'none';
-        el.style.strokeDashoffset = '0';
-        el.classList.toggle('glow', s >= 4);
-        if (s >= 4) el.setAttribute('filter', 'url(#plx-glow)'); else el.removeAttribute('filter');
-      };
-      const times = (n) => `${n} ${n === 1 ? 'time' : 'times'}`;
-      const updateNetLabels = (interactive) => {
-        statusEl.textContent = interactive ? `Practised ${times(practised)} · Time passed ${times(waited)}` : '';
-        showPill($('.plx-l-path'), interactive && practised === 0 && waited === 0);
-        showPill($('.plx-l-strong'), interactive && edges.some((e) => e.onPath && e.s >= 4));
-        showPill($('.plx-l-weak'), interactive && weakenedPath && !edges.some((e) => e.onPath && e.s >= 4));
-        const pruned = edges.find((e) => e.s === 0);
-        const pl = $('.plx-l-pruned');
-        if (interactive && pruned) {
-          const [u, v] = pruned.key.split('-');
-          const mx = (NODES[u][0] + NODES[v][0]) / 2, my = (NODES[u][1] + NODES[v][1]) / 2;
-          const ly = my > 200 ? my + 44 : my - 40;
-          const lx = Math.max(110, Math.min(530, mx));
-          pl.setAttribute('transform', `translate(${lx} ${ly})`);
-          if (!pl.querySelector('line')) {
-            pl.insertAdjacentHTML('afterbegin', `<line style="stroke:${C.soft}" stroke-width="1.5"/>`);
-          }
-          const ln = pl.querySelector('line');
-          ln.setAttribute('x1', 0); ln.setAttribute('y1', 0); ln.setAttribute('x2', mx - lx); ln.setAttribute('y2', my - ly);
-          showPill(pl, true);
-        } else showPill(pl, false);
-        fitPills($('[data-scene="net"]'));
-      };
-      const resetNet = () => {
-        edges.forEach((e) => { e.s = e.s0; styleEdge(e); });
-        used.clear(); practised = 0; waited = 0; weakenedPath = false;
-      };
-      const pulse = () => {
-        const dot = $('.plx-pulse');
-        const nodeEls = PATH.map((k) => $(`[data-n="${k}"]`));
-        if (rm()) { // still frame: light the whole pathway briefly, no motion
-          nodeEls.forEach((n) => n.classList.add('on'));
-          later(() => nodeEls.forEach((n) => n.classList.remove('on')), 900);
-          return;
-        }
-        cancelAnimationFrame(raf);
-        const pts = PATH.map((k) => NODES[k]);
-        const dur = 2000, t0 = performance.now();
-        let lastNode = -1;
-        const frame = (now) => {
-          const t = Math.min(1, (now - t0) / dur);
-          const sgm = t * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(sgm)), f = sgm - i;
-          const x = pts[i][0] + (pts[i + 1][0] - pts[i][0]) * f, y = pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f;
-          dot.setAttribute('cx', x.toFixed(1)); dot.setAttribute('cy', y.toFixed(1)); dot.setAttribute('opacity', '1');
-          const ni = Math.round(sgm);
-          if (ni !== lastNode && Math.abs(sgm - ni) < 0.08) {
-            lastNode = ni; const el = nodeEls[ni]; el.classList.add('on'); later(() => el.classList.remove('on'), 600);
-          }
-          if (t < 1) raf = requestAnimationFrame(frame); else dot.setAttribute('opacity', '0');
-        };
-        raf = requestAnimationFrame(frame);
-      };
-      const practise = () => {
-        practised++;
-        edges.filter((e) => e.onPath).forEach((e) => { e.s = Math.min(5, e.s + 1); used.add(e.key); styleEdge(e); });
-        pulse();
-        updateNetLabels(true);
-        cap.textContent = 'Practising sends signals along the same pathway, so those connections get stronger.';
-      };
-      const letTimePass = () => {
-        waited++;
-        edges.forEach((e) => {
-          if (!used.has(e.key) && e.s > 0) { e.s -= 1; if (e.onPath) weakenedPath = true; styleEdge(e); }
-        });
-        used.clear();
-        updateNetLabels(true);
-        cap.textContent = edges.some((e) => e.s === 0)
-          ? 'Connections that were not used got weaker. Some have been pruned (removed).'
-          : 'Time passed. Connections that were not used got weaker.';
-      };
-
-      // ================= recovery state
-      const rScene = $('[data-scene="recovery"]');
-      let damaged = false;
-      const setDamage = (on) => { damaged = on; rScene.classList.toggle('plx-damaged', on); };
-      const showRecovery = (step, animate) => {
-        if (step >= 5) setDamage(true);
-        $('.plx-r-brain').classList.toggle('dim', ![4, 7].includes(step));
-        $('.plx-r-inset').classList.toggle('dim', step === 7);
-        $('.plx-m-unmask').classList.toggle('dim', step > 5);
-        $('.plx-m-sprout').classList.toggle('dim', step > 6);
-        $$('.plx-unmask').forEach((p, i) => (step >= 5 ? grow(p, animate && step === 5, 1400, 300 + i * 450) : ungrow(p)));
-        $$('.plx-sprout').forEach((p, i) => (step >= 6 ? grow(p, animate && step === 6, 1800, 300 + i * 500) : ungrow(p)));
-        $$('.plx-vnew').forEach((p, i) => (step >= 8 ? grow(p, animate && step === 8, 1800, 200 + i * 500) : ungrow(p)));
-        const halo = $('.plx-m-halo'), homo = $('.plx-m-homo');
-        halo.classList.remove('on'); homo.classList.remove('on');
-        if (step >= 8) { halo.getBoundingClientRect(); later(() => halo.classList.add('on'), animate && step === 8 && !rm() ? 900 : 0); }
-        if (step >= 7) { homo.getBoundingClientRect(); later(() => homo.classList.add('on'), animate && step === 7 && !rm() ? 900 : 0); }
-        const arc = $('.plx-arc');
-        arc.removeAttribute('marker-end');
-        if (step >= 7) {
-          const slow = animate && step === 7 && !rm();
-          grow(arc, slow, 1100);
-          later(() => arc.setAttribute('marker-end', 'url(#plx-arrow)'), slow ? 1100 : 0);
-        } else ungrow(arc);
-        $$('.plx-rl').forEach((el) => showPill(el, false));
-        if (step === 4) { showPill($('.plx-rl-zoom'), true); $$('.plx-rl-dmg').forEach((el) => { showPill(el, damaged); el.style.opacity = damaged ? '1' : '0'; }); }
-        $$(`.plx-rl-${step}`).forEach((el) => showPill(el, true));
-        fitPills(rScene);
-      };
-
-      // ================= scene switching
-      const SCENE_OF = (s) => (s <= 1 || s >= 11 ? 'net' : s === 2 ? 'maguire' : s === 3 ? 'studies' : s <= 8 ? 'recovery' : s === 9 ? 'evalA' : 'evalB');
-      const scenes = Object.fromEntries($$('[data-scene]').map((g) => [g.dataset.scene, g]));
-      let current = null;
-      const setScene = (name) => {
-        if (current !== name) {
-          Object.entries(scenes).forEach(([k, g]) => { g.style.display = k === name ? '' : 'none'; });
-          current = name;
-        }
-        return scenes[name];
-      };
-      const growBars = (scope, animate) => {
-        $$('.plx-bar', scope).forEach((b) => {
-          b.classList.add('low'); b.getBoundingClientRect();
-          if (animate && !rm()) later(() => b.classList.remove('low'), 150); else b.classList.remove('low');
-        });
-      };
-
-      let stepNow = -1;
-      const play = (step, animate = true) => {
-        stopAll();
-        const name = SCENE_OF(step);
-        const scene = setScene(name);
-        const [caption, aria] = CAPTIONS[step] || ['Neurons connect to each other at synapses, forming networks.', 'A network of neurons connected by links of different strengths.'];
-        cap.textContent = caption;
-        svg.setAttribute('aria-label', aria);
-        setControls([]);
-
-        if (name === 'net') {
-          const interactive = step === 1;
-          $('.plx-pathglow').classList.toggle('on', interactive);
-          $('.plx-key').style.display = step === 0 ? 'none' : '';
-          edges.forEach(styleEdge);
-          if (step < 0) edges.find((e) => e.key === NEW_EDGE).el.style.opacity = '0';
-          showPill($('.plx-l-new'), step === 0);
-          if (step === 0) {
-            const ne = edges.find((e) => e.key === NEW_EDGE);
-            ne.el.style.stroke = C.mint; ne.el.style.opacity = '1';
-            ne.el.style.strokeWidth = '4';
-            grow(ne.el, animate, 1600, 400);
-            setControls([{ label: '↻ Play again', onClick: () => play(0) }]);
-          }
-          if (interactive) {
-            setControls([
-              { label: 'Practise', onClick: practise },
-              { label: 'Let time pass', onClick: letTimePass },
-              { label: '↺ Start again', onClick: () => { resetNet(); updateNetLabels(true); cap.textContent = CAPTIONS[1][0]; } },
-            ]);
-          }
-          updateNetLabels(interactive);
-        } else if (name === 'maguire') {
-          fitPills(scene);
-          growBars(scene, animate);
-          setControls([{ label: '↻ Play again', onClick: () => play(2) }]);
-        } else if (name === 'studies') {
-          fitPills(scene);
-          $$('.plx-wave', scene).forEach((p, i) => grow(p, animate, 1600, i * 400));
-          setControls([{ label: '↻ Play again', onClick: () => play(3) }]);
-        } else if (name === 'recovery') {
-          if (step === 4) {
-            const label = () => (damaged ? '↺ Undo the damage' : 'Damage this area');
-            setControls([{ label: label(), id: 'dmg', onClick: (ev) => {
-              setDamage(!damaged);
-              ev.currentTarget.textContent = label();
-              cap.textContent = damaged ? 'A small area is damaged. Nearby neurons have lost some of their connections.' : CAPTIONS[4][0];
-              showRecovery(4, true);
-            } }]);
-            if (damaged) cap.textContent = 'A small area is damaged. Nearby neurons have lost some of their connections.';
-          } else {
-            setControls([{ label: '↻ Play again', onClick: () => play(step) }]);
-          }
-          showRecovery(step, animate);
-        } else {
-          fitPills(scene);
-          growBars(scene, animate);
-          $$('.plx-grow', scene).forEach((p, i) => grow(p, animate, 1500, 200 + i * 500));
-          if (name === 'evalB') setControls([{ label: '↻ Play again', onClick: () => play(10) }]);
-          if (name === 'evalA') setControls([{ label: '↻ Play again', onClick: () => play(9) }]);
-        }
-      };
-
-      edges.forEach(styleEdge);
-      return {
-        show(step) {
-          const moved = step !== stepNow;
-          stepNow = step;
-          play(step, moved);
-        },
-        dispose() { stopAll(); root.remove(); },
-      };
-    },
-  },
+  visual: VISUAL,
 };

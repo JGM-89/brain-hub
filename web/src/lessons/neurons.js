@@ -1,549 +1,180 @@
 // Neurons — AQA 7182 Biopsychology (AS + A-level):
 // "The structure and function of sensory, relay and motor neurons."
-// Visual: hand-built SVG scenes on the dark stage —
-//   1. an anatomical neuron whose parts light up step by step (leader-line labels),
-//   2. a zoomed-in axon race: myelinated (jumps node to node) v. unmyelinated,
-//   3. sensory, relay and motor neurons side by side at their typical shapes,
-//   4. a reflex arc (hot object → receptor → sensory → relay → motor → muscle).
-// Every animation plays once (with a "Play again" button) and shows a still end-state when
-// reducedMotion() is on.
+// Visual: real 3D neurons built from published reconstructions (NeuroMorpho.Org, see public/neurons/credits.json):
+//   1. a human cortical pyramidal neuron whose parts light up step by step (labels anchored to 3D points),
+//   2. myelinated v. unmyelinated axons racing (the impulse jumps node to node on the myelinated one),
+//   3. sensory, relay and motor neurons, one row each (real shapes; parts that were not reconstructed are drawn
+//      and labelled as drawn),
+//   4. a reflex arc through a simple 3D spinal cord: receptor → sensory → relay → motor → muscle.
+// Animations play once, with "Play again". With reduced motion they show a still end-state; calm mode turns
+// the glow off. The learner can turn and zoom every scene (mouse, touch, or arrow keys when the picture has focus).
+import * as THREE from 'three';
 import { reducedMotion, get } from '../settings.js';
+import { createStage } from '../three/stage3d.js';
+import { tissueMaterial } from '../three/look.js';
+import { loadSWC, buildNeuron, geodesic, mainAxonTip, straightAxonNodes, updatePixelScale, createSpark } from '../three/neuron3d.js';
 
-/* ------------------------------------------------------------------ helpers */
-const NS = 'http://www.w3.org/2000/svg';
-function s(tag, attrs = {}, parent) {
-  const e = document.createElementNS(NS, tag);
-  for (const k in attrs) e.setAttribute(k, attrs[k]);
-  if (parent) parent.append(e);
-  return e;
-}
+const BASE = import.meta.env.BASE_URL;
+const SWC = {
+  pyramidal: `${BASE}neurons/pyramidal-human-685815936.swc`,
+  motor: `${BASE}neurons/motor-rat-alvarez-control-1.swc`,
+  relay: `${BASE}neurons/relay-mouse-todd-26-2-15-C.swc`,
+  skin: `${BASE}neurons/sensory-skin-ending-mouse-A21-44.swc`,
+};
+const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const seg = (t, a, b) => clamp((t - a) / (b - a));
-const ease = (u) => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2);
-const lerp = (a, b, u) => a + (b - a) * u;
-const f1 = (n) => n.toFixed(1);
-function rng(seed) { return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
-
-// One rAF loop for all tweens. In reduced-motion mode a tween jumps straight to its end.
-function makeTweens() {
-  let list = [], raf = 0;
-  const loop = (now) => {
-    const fin = [];
-    list = list.filter((tw) => {
-      const u = Math.min(1, (now - tw.t0) / tw.dur);
-      tw.fn(u);
-      if (u >= 1) { fin.push(tw); return false; }
-      return true;
-    });
-    fin.forEach((tw) => tw.done?.());
-    raf = list.length ? requestAnimationFrame(loop) : 0;
-  };
-  return {
-    add(dur, fn, done) {
-      if (reducedMotion() || dur <= 0) { fn(1); done?.(); return; }
-      list.push({ t0: performance.now(), dur, fn, done });
-      if (!raf) raf = requestAnimationFrame(loop);
-    },
-    clear() { list = []; cancelAnimationFrame(raf); raf = 0; },
-  };
-}
-
-// A label: dot on the part, leader line, text on a soft dark pill.
-function label(parent, { at, to, pos = 'right', anchor, text, sub }) {
-  const g = s('g', { class: 'lbl' }, parent);
-  if (at) {
-    s('line', { x1: at[0], y1: at[1], x2: to[0], y2: to[1], class: 'leader' }, g);
-    s('circle', { cx: at[0], cy: at[1], r: 4, class: 'leader-dot' }, g);
-  }
-  const pill = s('rect', { class: 'pill', rx: 10 }, g);
-  const [lx, ly] = to;
-  const extra = sub ? 22 : 0;
-  let x = lx, y = ly, a = 'middle';
-  if (pos === 'right') { x = lx + 12; y = ly + 7 - extra / 2; a = 'start'; }
-  if (pos === 'left') { x = lx - 12; y = ly + 7 - extra / 2; a = 'end'; }
-  if (pos === 'above') { y = ly - 12 - extra; }
-  if (pos === 'below') { y = ly + 26; }
-  if (pos === 'none') { y = ly + 7; }
-  if (anchor) a = anchor;
-  const t = s('text', { x, y, 'text-anchor': a }, g);
-  t.append(document.createTextNode(text));
-  if (sub) { const ts = s('tspan', { x, dy: 22, class: 'sub' }, t); ts.textContent = sub; }
-  g.fit = () => {
-    try {
-      const b = t.getBBox();
-      if (!b.width) return;
-      pill.setAttribute('x', f1(b.x - 9)); pill.setAttribute('y', f1(b.y - 4));
-      pill.setAttribute('width', f1(b.width + 18)); pill.setAttribute('height', f1(b.height + 8));
-    } catch { /* not rendered yet */ }
-  };
-  return g;
-}
-
-/* ------------------------------------------------------------------ palette */
-const C = {
-  cell: '#F4A28A', next: '#8FB6FF', pulse: '#9AF4FF',
-  sens: '#FFB27D', relay: '#B9A2FF', motor: '#6FD8C4',
-};
+const smooth = (u) => u * u * (3 - 2 * u);
 
 const CSS = `
-.nrn-vis svg { width: 100%; height: 100%; }
-.nrn-vis .part { transition: opacity .5s ease; }
-.nrn-vis .part.dim { opacity: .16; }
-.nrn-vis .part.gone { opacity: 0; }
-.nrn-vis .lbl { opacity: 0; transition: opacity .45s ease; pointer-events: none; }
-.nrn-vis .lbl.on { opacity: 1; }
-.nrn-vis .leader { stroke: rgb(236 239 247 / 75%); stroke-width: 1.6; }
-.nrn-vis .leader-dot { fill: #ECEFF7; }
-.nrn-vis .pill { fill: rgb(8 13 27 / 80%); stroke: rgb(236 239 247 / 18%); stroke-width: 1; }
-.nrn-vis .diagram text { font-size: 20px; font-weight: 700; letter-spacing: 0; word-spacing: 0; }
-.nrn-vis .diagram text .sub, .nrn-vis .diagram text.sub { font-size: 18px; font-weight: 400; fill: #C3CCE4; }
-.nrn-vis .diagram text.h { font-size: 22px; }
-.nrn-vis .diagram text.note { font-size: 18px; font-weight: 400; fill: #C3CCE4; }
-.nrn-vis .diagram text.ok { font-size: 18px; fill: #9AF4FF; }
-.nrn-vis.calm [filter] { filter: none; }
+.nrn3d-cap { background: rgb(8 12 24 / 82%); padding: 8px 14px; border-radius: 12px; width: fit-content; max-width: calc(100% - 32px); line-height: 1.35; }
+.nrn3d-note { position: absolute; right: 14px; top: 14px; z-index: 2; background: rgb(8 12 24 / 82%); color: #F4F6FB; border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 10px; padding: 6px 10px; font-size: 15px; font-weight: 700; max-width: 46%; pointer-events: none; }
+.nrn3d-note[hidden] { display: none; }
+.nrn3d-loading { position: absolute; inset: 0; display: grid; place-items: center; color: #ECEFF7; font-weight: 700; font-size: 1.05rem; }
+.lesson-visual .vis-controls button.nrn3d-btn { min-height: 44px; min-width: 44px; }
+@media (max-width: 700px) { .nrn3d-note { max-width: 60%; font-size: 15px; } }
 `;
 
-function defs(svg) {
-  const d = s('defs', {}, svg);
-  d.innerHTML = `
-    <filter id="nrn-glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="nrn-soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <radialGradient id="nrn-soma" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#FFE3D8"/><stop offset=".55" stop-color="#F4A28A"/><stop offset="1" stop-color="#C9654F"/></radialGradient>
-    <radialGradient id="nrn-nuc" cx="38%" cy="35%" r="70%"><stop offset="0" stop-color="#C9BDFF"/><stop offset=".6" stop-color="#7E6BEA"/><stop offset="1" stop-color="#4C3AB8"/></radialGradient>
-    <linearGradient id="nrn-my" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF5D6"/><stop offset=".45" stop-color="#F5CD6E"/><stop offset="1" stop-color="#B8842A"/></linearGradient>
-    <linearGradient id="nrn-tube" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD9CC"/><stop offset=".5" stop-color="#F4A28A"/><stop offset="1" stop-color="#BE5C48"/></linearGradient>
-    <radialGradient id="nrn-halo" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#9AF4FF" stop-opacity=".75"/><stop offset=".45" stop-color="#3FD8FF" stop-opacity=".28"/><stop offset="1" stop-color="#3FD8FF" stop-opacity="0"/></radialGradient>
-    <radialGradient id="nrn-warm" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FFF0C2" stop-opacity=".9"/><stop offset=".5" stop-color="#FFC27A" stop-opacity=".3"/><stop offset="1" stop-color="#FFC27A" stop-opacity="0"/></radialGradient>
-    <radialGradient id="nrn-g-sens" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#FFE6D2"/><stop offset="1" stop-color="${C.sens}"/></radialGradient>
-    <radialGradient id="nrn-g-relay" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#EEE6FF"/><stop offset="1" stop-color="${C.relay}"/></radialGradient>
-    <radialGradient id="nrn-g-motor" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#DDFBF4"/><stop offset="1" stop-color="${C.motor}"/></radialGradient>
-    <radialGradient id="nrn-muscle" cx="45%" cy="35%" r="75%"><stop offset="0" stop-color="#FFC2CB"/><stop offset=".6" stop-color="#E8798A"/><stop offset="1" stop-color="#B44A5C"/></radialGradient>
-    <linearGradient id="nrn-skin" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F6DCC4"/><stop offset="1" stop-color="#D9A47E"/></linearGradient>
-    <linearGradient id="nrn-hot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFB36B"/><stop offset="1" stop-color="#D8452F"/></linearGradient>
-    <radialGradient id="nrn-cord" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#3A4E7C"/><stop offset="1" stop-color="#26355A"/></radialGradient>
-    <marker id="nrn-arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ECEFF7"/></marker>`;
-}
-
-// A glowing impulse "spark": bright core + soft halo.
-function spark(parent, r = 9) {
-  const g = s('g', { opacity: 0 }, parent);
-  s('circle', { r: r * 2.6, fill: 'url(#nrn-halo)' }, g);
-  s('circle', { r, fill: C.pulse, filter: 'url(#nrn-glow)' }, g);
+/* ------------------------------------------------------------------ small 3D helpers */
+function scaleBar(lengthUm, at, unitsPerUm, color = '#EEF2FF') {
+  const g = new THREE.Group();
+  const L = lengthUm * unitsPerUm;
+  const m = new THREE.MeshBasicMaterial({ color, toneMapped: false });
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(L, L * 0.035, L * 0.035), m);
+  bar.position.set(at.x + L / 2, at.y, at.z);
+  const capG = new THREE.BoxGeometry(L * 0.03, L * 0.14, L * 0.03);
+  const c1 = new THREE.Mesh(capG, m); c1.position.set(at.x, at.y, at.z);
+  const c2 = new THREE.Mesh(capG, m); c2.position.set(at.x + L, at.y, at.z);
+  g.add(bar, c1, c2);
+  g.userData.mid = V(at.x + L / 2, at.y, at.z);
   return g;
 }
-const place = (el, x, y, k = 1) => el.setAttribute('transform', `translate(${f1(x)} ${f1(y)})${k !== 1 ? ` scale(${k.toFixed(3)})` : ''}`);
 
-// Branching dendrite tree (seeded so it looks the same every time).
-function tree(parent, rand, x, y, ang, gen, W, L, chain) {
-  const len = L[gen] * (0.85 + rand() * 0.3);
-  const bend = (rand() - 0.5) * 0.6;
-  const x2 = x + Math.cos(ang) * len, y2 = y + Math.sin(ang) * len;
-  const mx = x + Math.cos(ang + bend) * len * 0.55, my = y + Math.sin(ang + bend) * len * 0.55;
-  s('path', { d: `M${f1(x)},${f1(y)} Q${f1(mx)},${f1(my)} ${f1(x2)},${f1(y2)}`, 'stroke-width': W[gen] }, parent);
-  if (chain) chain.push([x2, y2]);
-  if (gen < L.length - 1) {
-    const sp = 0.36 + rand() * 0.24;
-    tree(parent, rand, x2, y2, ang - sp, gen + 1, W, L, chain);
-    tree(parent, rand, x2, y2, ang + sp, gen + 1, W, L, null);
+/** Build a sensory neuron: a REAL skin ending (Wu, Williams & Nathans 2012) on a DRAWN fibre, cell body and
+ *  T-junction (the pseudo-unipolar shape of a dorsal root ganglion neuron). All positions in µm (local). */
+function sensoryNodes(skin, { arbor, periph, soma, somaR = 22, central, twigs = 3, fibreR = 1.6 }) {
+  const nodes = []; let id = 1;
+  const add = (p, type, parent, extra = {}) => { const n = { id: id++, type, x: p.x, y: p.y, z: p.z, r: extra.r ?? fibreR, parent, drawn: true, ...extra }; nodes.push(n); return n; };
+  const somaN = add(soma, 1, -1, { r: somaR });
+  const T = periph[periph.length - 1];
+  // short stem from the cell body to the T-junction
+  const stem = [soma.clone().lerp(T, 0.45), soma.clone().lerp(T, 0.8), T.clone()];
+  let prev = somaN;
+  for (const p of stem) prev = add(p, 3, prev.id, { r: fibreR * 1.2 });
+  const tNode = prev;
+  // peripheral fibre: T → skin (walk the given points backwards)
+  prev = tNode;
+  for (let i = periph.length - 2; i >= 0; i--) prev = add(periph[i], 3, prev.id, { part: 'dendrites' });
+  const J = prev;
+  // the real skin ending (no diameters in the original, so a thin fixed radius)
+  const map = new Map();
+  const root = skin.nodes.find((n) => !skin.nodes.some((m) => m.id === n.parent));
+  for (const n of skin.nodes) {
+    const p = V(n.x, n.y, n.z).applyMatrix4(arbor);
+    const parent = n === root ? J.id : map.get(n.parent);
+    const nn = add(p, 3, parent, { r: 0.9, drawn: false, arbor: true, part: 'dendrites' });
+    map.set(n.id, nn.id);
   }
+  // central branch: T → spinal cord, with a few short twigs ending in terminal buttons
+  prev = tNode;
+  for (let i = 1; i < central.length; i++) prev = add(central[i], 2, prev.id);
+  const end = central[central.length - 1], dir = end.clone().sub(central[central.length - 2]).normalize();
+  const side = V(-dir.y, dir.x, 0).normalize();
+  const twigLen = end.distanceTo(central[central.length - 2]) * 0.35;
+  for (let k = 0; k < twigs; k++) {
+    const a = (k - (twigs - 1) / 2) * 0.7;
+    const p1 = end.clone().addScaledVector(dir, twigLen * 0.5).addScaledVector(side, a * twigLen * 0.45);
+    const p2 = p1.clone().addScaledVector(dir, twigLen * 0.5).addScaledVector(side, a * twigLen * 0.5);
+    const m1 = add(p1, 2, prev.id, { r: fibreR * 0.8 });
+    add(p2, 2, m1.id, { r: fibreR * 0.7 });
+  }
+  // impulse distance: starts in the skin ending (negative) and runs through the fibre into the spinal cord
+  const g = geodesic(nodes, J.id);
+  for (const n of nodes) n.d = n.arbor ? -g.get(n.id) : g.get(n.id);
+  return { nodes, junction: J, tNode, somaNode: somaN };
 }
-const rad = (deg) => (deg * Math.PI) / 180;
 
-/* ------------------------------------------------------------------ scene 1: anatomy */
-function buildAnatomy(svg) {
-  const g = s('g', {}, svg);
-  const P = {}, Lb = {};
-  const SX = 205, SY = 300, R0 = 40;
-  const rand = rng(11);
+/** Extend a reconstruction's main axon (which leaves the tissue) with a DRAWN continuation through `points`
+ *  (local µm), ending in a few branches with terminal buttons (a neuromuscular junction). */
+function extendAxon(nodes, points, { r = 1.6, twigs = 4, twigLen = 60 } = {}) {
+  const tip = mainAxonTip(nodes);
+  let id = Math.max(...nodes.map((n) => n.id)) + 1;
+  let prev = tip;
+  const all = [V(tip.x, tip.y, tip.z), ...points];
+  const curve = new THREE.CatmullRomCurve3(all, false, 'centripetal');
+  const L = curve.getLength(); const n = Math.max(8, Math.ceil(L / 60));
+  for (let i = 1; i <= n; i++) {
+    const p = curve.getPointAt(i / n);
+    const node = { id: id++, type: 2, x: p.x, y: p.y, z: p.z, r, parent: prev.id, drawn: true, noTerminal: true };
+    nodes.push(node); prev = node;
+  }
+  const end = curve.getPointAt(1), dir = curve.getTangentAt(1);
+  const side = new THREE.Vector3().crossVectors(dir, V(0, 0, 1)).normalize();
+  const up = new THREE.Vector3().crossVectors(side, dir).normalize();
+  for (let k = 0; k < twigs; k++) {
+    const a = (k / twigs) * Math.PI * 2;
+    const off = side.clone().multiplyScalar(Math.cos(a)).addScaledVector(up, Math.sin(a) * 0.6);
+    const p1 = end.clone().addScaledVector(dir, twigLen * 0.4).addScaledVector(off, twigLen * 0.45);
+    const p2 = p1.clone().addScaledVector(dir, twigLen * 0.3).addScaledVector(off, twigLen * 0.35);
+    const m1 = { id: id++, type: 2, x: p1.x, y: p1.y, z: p1.z, r: r * 0.7, parent: prev.id, drawn: true };
+    const m2 = { id: id++, type: 2, x: p2.x, y: p2.y, z: p2.z, r: r * 0.6, parent: m1.id, drawn: true };
+    nodes.push(m1, m2);
+  }
+  // drawn nodes past the real tip: remember where the reconstruction stops
+  return { realTip: V(tip.x, tip.y, tip.z), end };
+}
 
-  // next neuron (only shown in the terminal-buttons step)
-  P.next = s('g', { class: 'part', fill: 'none', stroke: C.next, 'stroke-linecap': 'round' }, g);
-  s('path', { d: 'M830,262 Q780,270 746,293', 'stroke-width': 7 }, P.next);
-  s('path', { d: 'M792,268 Q776,244 768,222', 'stroke-width': 3.5 }, P.next);
-  s('path', { d: 'M812,266 Q790,320 750,352', 'stroke-width': 5 }, P.next);
-  s('path', { d: 'M780,315 Q800,345 804,372', 'stroke-width': 3 }, P.next);
-
-  // dendrites
-  P.dendrites = s('g', { class: 'part', fill: 'none', stroke: C.cell, 'stroke-linecap': 'round' }, g);
-  const W = [8, 5.2, 3.4, 2.2], L = [46, 32, 22, 15];
-  const chain = [];
-  const roots = [[180, 0], [214, 0], [148, 0], [250, 1], [112, 1]];
-  roots.forEach(([deg, gen], k) => {
-    const a = rad(deg);
-    const x0 = SX + Math.cos(a) * (R0 - 6), y0 = SY + Math.sin(a) * (R0 - 6);
-    if (k === 0) chain.push([x0, y0]);
-    tree(P.dendrites, rand, x0, y0, a, gen, W.slice(gen), L.slice(gen), k === 0 ? chain : null);
-  });
-
-  // cell body (blob) + nucleus
-  P.soma = s('g', { class: 'part' }, g);
+function muscleMesh(length, radius, color = '#C4505C') {
   const pts = [];
-  for (let i = 0; i < 44; i++) {
-    const th = (i / 44) * Math.PI * 2;
-    const r = R0 + 4 * Math.sin(3 * th + 0.5) + 2.5 * Math.cos(5 * th);
-    pts.push([SX + Math.cos(th) * r, SY + Math.sin(th) * r]);
-  }
-  const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-  let d = `M${mid(pts[43], pts[0]).map(f1)}`;
-  pts.forEach((p, i) => { const m = mid(p, pts[(i + 1) % 44]); d += ` Q${f1(p[0])},${f1(p[1])} ${f1(m[0])},${f1(m[1])}`; });
-  s('path', { d: d + 'Z', fill: 'url(#nrn-soma)' }, P.soma);
-  P.nucleus = s('g', { class: 'part' }, g);
-  s('circle', { cx: SX - 3, cy: SY - 2, r: 15, fill: 'url(#nrn-nuc)' }, P.nucleus);
-  s('circle', { cx: SX - 7, cy: SY - 6, r: 4, fill: '#ECE6FF', opacity: 0.75 }, P.nucleus);
+  for (let i = 0; i <= 24; i++) { const u = i / 24; pts.push(new THREE.Vector2(radius * Math.pow(Math.sin(Math.PI * u), 0.75) + radius * 0.04, (u - 0.5) * length)); }
+  const g = new THREE.LatheGeometry(pts, 40);
+  g.rotateZ(Math.PI / 2);
+  const m = new THREE.Mesh(g, tissueMaterial(color, { roughness: 0.55, sheen: 0.4 }));
+  // tendon ends
+  const tg = new THREE.CylinderGeometry(radius * 0.09, radius * 0.12, length * 0.22, 16); tg.rotateZ(Math.PI / 2);
+  const tm = tissueMaterial('#EDE3D3', { roughness: 0.4 });
+  const t1 = new THREE.Mesh(tg, tm); t1.position.x = -length * 0.58;
+  const t2 = new THREE.Mesh(tg, tm); t2.position.x = length * 0.58;
+  m.add(t1, t2);
+  return m;
+}
 
-  // axon (gentle curve) + hillock
-  const AX0 = SX + 36, AX1 = 640;
-  const ay = (x) => SY + 7 * Math.sin(((x - AX0) / (AX1 - AX0)) * Math.PI * 1.5);
-  P.axon = s('g', { class: 'part' }, g);
-  s('path', { d: `M${SX + 28},${SY - 13} Q${SX + 44},${SY - 5} ${AX0 + 14},${f1(ay(AX0 + 14) - 3.5)} L${AX0 + 14},${f1(ay(AX0 + 14) + 3.5)} Q${SX + 44},${SY + 5} ${SX + 28},${SY + 13}Z`, fill: C.cell }, P.axon);
-  let ad = `M${AX0},${SY}`;
-  for (let x = AX0 + 8; x <= AX1; x += 8) ad += ` L${x},${f1(ay(x))}`;
-  s('path', { d: ad, fill: 'none', stroke: C.cell, 'stroke-width': 7, 'stroke-linecap': 'round' }, P.axon);
-
-  // myelin sheath segments with nodes of Ranvier between them
-  P.myelin = s('g', { class: 'part' }, g);
-  const MY = [262, 334, 406, 478, 550], ML = 58;
-  MY.forEach((a) => {
-    const cx = a + ML / 2, cy = ay(cx);
-    const ang = (Math.atan2(ay(cx + 1) - ay(cx - 1), 2) * 180) / Math.PI;
-    const tr = `rotate(${ang.toFixed(2)} ${f1(cx)} ${f1(cy)})`;
-    s('rect', { x: f1(cx - ML / 2), y: f1(cy - 13), width: ML, height: 26, rx: 13, fill: 'url(#nrn-my)', transform: tr }, P.myelin);
-    s('rect', { x: f1(cx - ML / 2 + 7), y: f1(cy - 9), width: ML - 14, height: 5, rx: 2.5, fill: '#fff', opacity: 0.35, transform: tr }, P.myelin);
-  });
-  const nodes = [AX0 + 16, 327, 399, 471, 543, 616];
-
-  // axon terminals + terminal buttons
-  P.terminals = s('g', { class: 'part' }, g);
-  const E = [AX1, ay(AX1)];
-  const bulbs = [[700, 246], [722, 294], [704, 350]];
-  bulbs.forEach(([bx, by]) => {
-    s('path', { d: `M${E[0] - 4},${f1(E[1])} Q${672},${f1(by * 0.45 + E[1] * 0.55)} ${bx - 8},${by}`, fill: 'none', stroke: C.cell, 'stroke-width': 5, 'stroke-linecap': 'round' }, P.terminals);
-    s('circle', { cx: bx, cy: by, r: 11, fill: 'url(#nrn-soma)' }, P.terminals);
-  });
-
-  // labels
-  Lb.dendrites = label(g, { at: chain[2], to: [95, 150], pos: 'above', text: 'Dendrites' });
-  Lb.nucleus = label(g, { at: [SX + 4, SY - 8], to: [292, 186], pos: 'right', text: 'Nucleus' });
-  Lb.soma = label(g, { at: [SX + 20, SY + 33], to: [232, 442], pos: 'below', text: 'Cell body (soma)' });
-  Lb.axon = label(g, { at: [628, ay(628)], to: [598, 228], pos: 'above', text: 'Axon' });
-  Lb.myelin = label(g, { at: [435, ay(435) + 13], to: [435, 402], pos: 'below', text: 'Myelin sheath' });
-  Lb.node = label(g, { at: [471, ay(471) - 4], to: [471, 226], pos: 'above', text: 'Node of Ranvier' });
-  Lb.terminals = label(g, { at: [706, 361], to: [606, 420], pos: 'below', text: 'Terminal buttons' });
-  Lb.gap = label(g, { at: [734, 294], to: [784, 196], pos: 'above', anchor: 'end', text: 'Synapse (tiny gap)' });
-  Lb.next = label(g, { at: [786, 315], to: [790, 470], pos: 'below', anchor: 'end', text: 'Next neuron' });
-  // direction arrow (impulse step)
-  Lb.direction = s('g', { class: 'lbl' }, g);
-  s('line', { x1: 150, y1: 512, x2: 690, y2: 512, stroke: '#ECEFF7', 'stroke-width': 2.5, 'marker-end': 'url(#nrn-arrow)', opacity: 0.8 }, Lb.direction);
-  const dt = s('text', { x: 420, y: 498, 'text-anchor': 'middle', class: 'note' }, Lb.direction);
-  dt.textContent = 'dendrites → cell body → axon → terminal buttons';
-
-  // impulse sprites
-  const warm = s('g', { opacity: 0 }, g);
-  s('circle', { r: 26, fill: 'url(#nrn-warm)' }, warm);
-  const somaGlow = s('circle', { cx: SX, cy: SY, r: 62, fill: 'url(#nrn-warm)', opacity: 0 }, g);
-  const nodeGlow = nodes.map((x) => s('circle', { cx: x, cy: f1(ay(x)), r: 8, fill: C.pulse, filter: 'url(#nrn-glow)', opacity: 0 }, g));
-  const sp = spark(g, 8);
-  const splits = bulbs.map(() => spark(g, 6));
-  const bulbGlow = bulbs.map(([bx, by]) => s('circle', { cx: bx, cy: by, r: 22, fill: 'url(#nrn-halo)', opacity: 0 }, g));
-
-  // pre-compute the dendrite → soma route
-  const route = chain.slice().reverse().concat([[SX, SY]]);
-  const routeLen = [0];
-  for (let i = 1; i < route.length; i++) routeLen.push(routeLen[i - 1] + Math.hypot(route[i][0] - route[i - 1][0], route[i][1] - route[i - 1][1]));
-  const along = (u) => {
-    const L2 = u * routeLen[routeLen.length - 1];
-    let i = 1; while (i < routeLen.length - 1 && routeLen[i] < L2) i++;
-    const k = (L2 - routeLen[i - 1]) / (routeLen[i] - routeLen[i - 1] || 1);
-    return [lerp(route[i - 1][0], route[i][0], k), lerp(route[i - 1][1], route[i][1], k)];
+/** Point at path distance d along a polyline (local points) → world, via toWorld. */
+function polyline(points, toWorld) {
+  const ds = [0];
+  for (let i = 1; i < points.length; i++) ds.push(ds[i - 1] + points[i].distanceTo(points[i - 1]));
+  return {
+    length: ds[ds.length - 1],
+    at(d) {
+      let i = 1; while (i < ds.length - 1 && ds[i] < d) i++;
+      const f = clamp((d - ds[i - 1]) / Math.max(1e-6, ds[i] - ds[i - 1]));
+      return toWorld(points[i - 1].clone().lerp(points[i], f));
+    },
   };
-
-  // Impulse timeline (ms): 0–1300 signal gathers along a dendrite, 1300–1700 cell body fires,
-  // 1700–3600 action potential jumps node to node, 3600–4300 spreads into the terminal buttons.
-  const HOP = 380, T_AX = 1700, T_END = T_AX + HOP * (nodes.length - 1);
-  function impulse(t) {
-    const u = seg(t, 0, 1300);
-    const [wx, wy] = along(ease(u));
-    place(warm, wx, wy); warm.setAttribute('opacity', f1(t < 1350 ? Math.min(1, u * 6) : 0));
-    somaGlow.setAttribute('opacity', (seg(t, 1100, 1450) * (1 - seg(t, 1800, 2600)) * 0.9).toFixed(2));
-    // node hopping
-    let x = nodes[0], vis = 0;
-    if (t >= T_AX && t < T_END + 80) {
-      const k = Math.min(nodes.length - 2, Math.floor((t - T_AX) / HOP));
-      const local = (t - T_AX - k * HOP) / HOP;
-      x = lerp(nodes[k], nodes[k + 1], ease(seg(local, 0.62, 1)));
-      vis = 1;
-      if (t >= T_END) x = nodes[nodes.length - 1];
-    }
-    if (t >= T_END && t < T_END + 300) { x = lerp(nodes[nodes.length - 1], AX1, seg(t, T_END, T_END + 300)); vis = 1; }
-    place(sp, x, ay(x)); sp.setAttribute('opacity', vis);
-    nodeGlow.forEach((c, k) => {
-      const tv = T_AX + k * HOP;
-      c.setAttribute('opacity', t < tv ? 0 : Math.max(0.3, 1 - (t - tv) / 700).toFixed(2));
-    });
-    const ub = seg(t, T_END + 300, T_END + 900);
-    splits.forEach((spk, k) => {
-      const [bx, by] = bulbs[k];
-      place(spk, lerp(AX1, bx, ease(ub)), lerp(E[1], by, ease(ub)));
-      spk.setAttribute('opacity', ub > 0 && ub < 1 ? 1 : 0);
-      bulbGlow[k].setAttribute('opacity', (seg(t, T_END + 850, T_END + 1100)).toFixed(2));
-    });
-  }
-  const IMPULSE_DUR = T_END + 1200;
-  function clearFx() { impulse(-1); }
-
-  return { g, P, Lb, impulse, IMPULSE_DUR, clearFx };
-}
-
-/* ------------------------------------------------------------------ scene 2: saltatory race */
-function buildSalt(svg) {
-  const g = s('g', {}, svg);
-  const Lb = {};
-  const title = (y, a, b) => { const t = s('text', { x: 50, y, class: 'h' }, g); t.append(document.createTextNode(a)); const ts = s('tspan', { class: 'sub' }, t); ts.textContent = b; };
-  title(140, 'With a myelin sheath', '  ·  the impulse jumps');
-  title(352, 'Without myelin', '  ·  it travels along every part');
-
-  // row 1 — myelinated
-  const Y1 = 230;
-  s('rect', { x: 50, y: Y1 - 11, width: 700, height: 22, rx: 11, fill: 'url(#nrn-tube)' }, g);
-  const MS = [80, 192, 304, 416, 528, 640], MW = 92;
-  MS.forEach((a) => {
-    s('rect', { x: a, y: Y1 - 31, width: MW, height: 62, rx: 28, fill: 'url(#nrn-my)' }, g);
-    s('rect', { x: a + 12, y: Y1 - 25, width: MW - 24, height: 9, rx: 4.5, fill: '#fff', opacity: 0.3 }, g);
-    [0.34, 0.66].forEach((k) => s('path', { d: `M${a + MW * k},${Y1 - 27} Q${a + MW * k + 7},${Y1} ${a + MW * k},${Y1 + 27}`, fill: 'none', stroke: '#8A5E16', 'stroke-width': 1.4, opacity: 0.35 }, g));
-  });
-  const hops = [62, 182, 294, 406, 518, 630, 742];
-  const arcs = hops.slice(0, -1).map((x, k) => s('path', { d: `M${x},${Y1 - 16} Q${(x + hops[k + 1]) / 2},${Y1 - 92} ${hops[k + 1]},${Y1 - 16}`, fill: 'none', stroke: C.pulse, 'stroke-width': 2.5, 'stroke-dasharray': '5 6', 'stroke-linecap': 'round', opacity: 0 }, g));
-  const nodeGlow = hops.map((x) => s('circle', { cx: x, cy: Y1, r: 9, fill: C.pulse, filter: 'url(#nrn-glow)', opacity: 0 }, g));
-  const sp1 = spark(g, 9);
-  Lb.myelin = label(g, { at: [126, Y1 + 31], to: [126, 292], pos: 'below', text: 'Myelin sheath' });
-  Lb.node = label(g, { at: [406, Y1 + 11], to: [406, 292], pos: 'below', text: 'Node of Ranvier' });
-  const done1 = s('text', { x: 750, y: 318, 'text-anchor': 'end', class: 'ok', opacity: 0 }, g); done1.textContent = '✓ Arrived first';
-
-  // row 2 — unmyelinated
-  const Y2 = 418;
-  s('rect', { x: 50, y: Y2 - 11, width: 700, height: 22, rx: 11, fill: 'url(#nrn-tube)' }, g);
-  const trail = s('rect', { x: 50, y: Y2 - 11, height: 22, rx: 11, width: 0, fill: C.pulse, opacity: 0.32 }, g);
-  const sp2 = spark(g, 9);
-  const done2 = s('text', { x: 750, y: 468, 'text-anchor': 'end', class: 'ok', opacity: 0 }, g); done2.textContent = '✓ Arrived later';
-  Lb.axon2 = label(g, { at: [150, Y2 + 11], to: [150, 452], pos: 'below', text: 'Axon with no myelin' });
-
-  const HOP = 420, T0 = 300, T1 = T0 + HOP * (hops.length - 1), T2 = 6600;
-  function race(t) {
-    let x = hops[0], vis1 = 0;
-    if (t >= T0 && t < T1 + 250) {
-      const k = Math.min(hops.length - 2, Math.floor((t - T0) / HOP));
-      x = t >= T1 ? hops[hops.length - 1] : lerp(hops[k], hops[k + 1], ease(seg((t - T0 - k * HOP) / HOP, 0.6, 1)));
-      vis1 = 1;
-      // the spark rises along the arc while it jumps
-      const kk = Math.min(hops.length - 2, Math.floor((t - T0) / HOP));
-      const lu = seg((t - T0 - kk * HOP) / HOP, 0.6, 1);
-      const lift = t >= T1 ? 0 : Math.sin(Math.PI * lu) * 58;
-      place(sp1, x, Y1 - lift);
-    } else place(sp1, x, Y1);
-    sp1.setAttribute('opacity', vis1);
-    arcs.forEach((a, k) => a.setAttribute('opacity', t >= T0 + k * HOP + HOP * 0.6 ? 0.8 : 0));
-    nodeGlow.forEach((c, k) => { const tv = T0 + k * HOP; c.setAttribute('opacity', t < tv ? 0 : Math.max(0.35, 1 - (t - tv) / 700).toFixed(2)); });
-    done1.setAttribute('opacity', seg(t, T1 + 100, T1 + 500).toFixed(2));
-    const u2 = seg(t, T0, T2 - 300);
-    const x2 = lerp(50, 750, u2);
-    place(sp2, x2, Y2); sp2.setAttribute('opacity', t >= T0 && t < T2 - 200 ? 1 : 0);
-    trail.setAttribute('width', f1(Math.max(0, x2 - 50)));
-    done2.setAttribute('opacity', seg(t, T2 - 250, T2).toFixed(2));
-  }
-  return { g, P: {}, Lb, race, DUR: T2 };
-}
-
-/* ------------------------------------------------------------------ scene 3: three types */
-function fiber(parent, x1, x2, y, color, myelin) {
-  s('line', { x1, y1: y, x2, y2: y, stroke: color, 'stroke-width': 5, 'stroke-linecap': 'round' }, parent);
-  if (!myelin) return;
-  for (let a = x1 + 10; a + 40 <= x2 - 6; a += 52) {
-    s('rect', { x: a, y: y - 9, width: 42, height: 18, rx: 9, fill: 'url(#nrn-my)' }, parent);
-  }
-}
-function bulbsAt(parent, x, y, color, grad) {
-  [[24, -16], [30, 0], [24, 16]].forEach(([dx, dy]) => {
-    s('path', { d: `M${x},${y} Q${x + 14},${y + dy * 0.3} ${x + dx - 5},${y + dy}`, fill: 'none', stroke: color, 'stroke-width': 3, 'stroke-linecap': 'round' }, parent);
-    s('circle', { cx: x + dx, cy: y + dy, r: 6.5, fill: grad }, parent);
-  });
-}
-function bush(parent, rand, x, y, r, angles, color) {
-  const g = s('g', { fill: 'none', stroke: color, 'stroke-linecap': 'round' }, parent);
-  angles.forEach((deg) => { const a = rad(deg); tree(g, rand, x + Math.cos(a) * (r - 3), y + Math.sin(a) * (r - 3), a, 0, [4, 2.6, 1.6], [20, 14, 9]); });
-}
-function chevrons(parent, xs, y) {
-  xs.forEach((x) => s('path', { d: `M${x - 4},${y - 6} L${x + 3},${y} L${x - 4},${y + 6}`, fill: 'none', stroke: '#0D1424', 'stroke-width': 2.4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', opacity: 0.55 }, parent));
-}
-
-function buildTypes(svg) {
-  const g = s('g', {}, svg);
-  const P = {}, rand = rng(5);
-  const title = (p, y, a, b) => { const t = s('text', { x: 40, y, class: 'h' }, p); t.append(document.createTextNode(a)); const ts = s('tspan', { class: 'sub' }, t); ts.textContent = b; };
-  const note = (p, x, y, txt) => { const t = s('text', { x, y, 'text-anchor': 'middle', class: 'note' }, p); t.textContent = txt; };
-
-  // sensory
-  const yS = 150;
-  P.sensory = s('g', { class: 'part' }, g);
-  title(P.sensory, 98, 'Sensory neuron', '  ·  from receptors to the CNS');
-  bush(P.sensory, rand, 74, yS, 4, [160, 180, 200], C.sens);
-  fiber(P.sensory, 74, 470, yS, C.sens, true);
-  s('line', { x1: 470, y1: yS, x2: 470, y2: yS + 26, stroke: C.sens, 'stroke-width': 4 }, P.sensory);
-  s('circle', { cx: 470, cy: yS + 40, r: 15, fill: 'url(#nrn-g-sens)' }, P.sensory);
-  s('circle', { cx: 468, cy: yS + 39, r: 5, fill: '#7E6BEA', opacity: 0.8 }, P.sensory);
-  fiber(P.sensory, 470, 600, yS, C.sens, true);
-  bulbsAt(P.sensory, 600, yS, C.sens, 'url(#nrn-g-sens)');
-  chevrons(P.sensory, [131, 235, 339, 527], yS);
-  note(P.sensory, 270, yS + 38, 'long dendrite');
-  note(P.sensory, 560, yS + 38, 'short axon');
-  note(P.sensory, 470, yS + 80, 'cell body');
-
-  // relay
-  const yR = 318;
-  P.relay = s('g', { class: 'part' }, g);
-  title(P.relay, 262, 'Relay neuron', '  ·  inside the CNS (brain and spinal cord)');
-  bush(P.relay, rand, 320, yR, 17, [150, 185, 220, 250, 115], C.relay);
-  fiber(P.relay, 336, 470, yR, C.relay, false);
-  s('circle', { cx: 320, cy: yR, r: 17, fill: 'url(#nrn-g-relay)' }, P.relay);
-  s('circle', { cx: 318, cy: yR - 1, r: 6, fill: '#7E6BEA', opacity: 0.8 }, P.relay);
-  bulbsAt(P.relay, 470, yR, C.relay, 'url(#nrn-g-relay)');
-  chevrons(P.relay, [380, 430], yR);
-  note(P.relay, 268, yR + 64, 'short dendrites');
-  note(P.relay, 420, yR + 40, 'short axon');
-
-  // motor
-  const yM = 462;
-  P.motor = s('g', { class: 'part' }, g);
-  title(P.motor, 400, 'Motor neuron', '  ·  from the CNS to muscles and glands');
-  bush(P.motor, rand, 120, yM, 19, [150, 180, 210, 132, 228], C.motor);
-  fiber(P.motor, 138, 640, yM, C.motor, true);
-  s('circle', { cx: 120, cy: yM, r: 19, fill: 'url(#nrn-g-motor)' }, P.motor);
-  s('circle', { cx: 118, cy: yM - 1, r: 6.5, fill: '#7E6BEA', opacity: 0.8 }, P.motor);
-  const muscle = s('g', {}, P.motor);
-  s('rect', { x: 676, y: yM - 46, width: 64, height: 92, rx: 22, fill: 'url(#nrn-muscle)' }, muscle);
-  for (let x = 688; x <= 728; x += 8) s('line', { x1: x, y1: yM - 38, x2: x, y2: yM + 38, stroke: '#FFE1E6', 'stroke-width': 1.2, opacity: 0.45 }, muscle);
-  bulbsAt(P.motor, 640, yM, C.motor, 'url(#nrn-g-motor)');
-  chevrons(P.motor, [247, 351, 455, 559], yM);
-  note(P.motor, 84, yM + 64, 'short dendrites');
-  note(P.motor, 390, yM + 40, 'long axon');
-  note(P.motor, 708, yM + 66, 'muscle');
-
-  // pulses
-  const FX = s('g', {}, g);
-  const mk = (y) => ({ trail: s('line', { x1: 0, y1: y, x2: 0, y2: y, stroke: C.pulse, 'stroke-width': 3, 'stroke-linecap': 'round', opacity: 0 }, FX), sp: spark(FX, 7), y });
-  const R = { sensory: { ...mk(yS), x0: 56, x1: 632, dur: 2300 }, relay: { ...mk(yR), x0: 276, x1: 500, dur: 1300 }, motor: { ...mk(yM), x0: 82, x1: 668, dur: 2300 } };
-  function run(kind, t) {
-    Object.entries(R).forEach(([k, r]) => {
-      const on = k === kind;
-      const u = on ? seg(t, 200, 200 + r.dur) : 0;
-      const x = lerp(r.x0, r.x1, ease(u));
-      place(r.sp, x, r.y); r.sp.setAttribute('opacity', on && u > 0 && u < 1 ? 1 : 0);
-      r.trail.setAttribute('x1', r.x0); r.trail.setAttribute('x2', f1(x)); r.trail.setAttribute('opacity', on && u > 0 ? 0.75 : 0);
-    });
-    const c = kind === 'motor' ? Math.sin(Math.PI * seg(t, 2450, 3300)) : 0;
-    muscle.setAttribute('transform', `translate(708 ${yM}) scale(${(1 - 0.12 * c).toFixed(3)} ${(1 + 0.08 * c).toFixed(3)}) translate(-708 ${-yM})`);
-  }
-  return { g, P, Lb: {}, run, dur: { sensory: 2600, relay: 1600, motor: 3400 } };
-}
-
-/* ------------------------------------------------------------------ scene 4: reflex arc */
-function buildReflex(svg) {
-  const g = s('g', {}, svg);
-  const Lb = {};
-  // spinal cord cross-section
-  const cord = s('g', {}, g);
-  s('ellipse', { cx: 612, cy: 250, rx: 118, ry: 98, fill: 'url(#nrn-cord)', stroke: '#7487BC', 'stroke-width': 2 }, cord);
-  const gm = s('g', { fill: '#A796DD', opacity: 0.42 }, cord);
-  s('ellipse', { cx: 580, cy: 208, rx: 14, ry: 40, transform: 'rotate(-28 580 208)' }, gm);
-  s('ellipse', { cx: 644, cy: 208, rx: 14, ry: 40, transform: 'rotate(28 644 208)' }, gm);
-  s('ellipse', { cx: 576, cy: 290, rx: 26, ry: 34, transform: 'rotate(18 576 290)' }, gm);
-  s('ellipse', { cx: 648, cy: 290, rx: 26, ry: 34, transform: 'rotate(-18 648 290)' }, gm);
-  s('rect', { x: 577, y: 238, width: 70, height: 24, rx: 12 }, gm);
-  s('circle', { cx: 612, cy: 250, r: 4, fill: '#0D1424' }, cord);
-
-  // muscle (effector) with tendons
-  const muscle = s('g', {}, g);
-  s('line', { x1: 252, y1: 492, x2: 284, y2: 492, stroke: '#E9DCCF', 'stroke-width': 5, 'stroke-linecap': 'round' }, muscle);
-  s('line', { x1: 436, y1: 492, x2: 468, y2: 492, stroke: '#E9DCCF', 'stroke-width': 5, 'stroke-linecap': 'round' }, muscle);
-  s('path', { d: 'M282,492 C304,462 414,462 438,492 C414,522 304,522 282,492Z', fill: 'url(#nrn-muscle)' }, muscle);
-  [-10, 0, 10].forEach((dy) => s('path', { d: `M300,${492 + dy} C330,${486 + dy * 1.4} 390,${486 + dy * 1.4} 420,${492 + dy}`, fill: 'none', stroke: '#FFE1E6', 'stroke-width': 1.2, opacity: 0.5 }, muscle));
-
-  // hot object + heat
-  s('rect', { x: 138, y: 350, width: 70, height: 92, rx: 14, fill: 'url(#nrn-hot)' }, g);
-  s('rect', { x: 146, y: 357, width: 54, height: 8, rx: 4, fill: '#fff', opacity: 0.25 }, g);
-  [152, 173, 194].forEach((x) => s('path', { d: `M${x},342 q-8,-10 0,-20 q8,-10 0,-20`, fill: 'none', stroke: '#FFB088', 'stroke-width': 3, 'stroke-linecap': 'round', opacity: 0.8 }, g));
-  const hot = s('text', { x: 220, y: 372, 'text-anchor': 'start', class: 'note' }, g); hot.textContent = 'Hot object';
-
-  // finger (moves away at the end)
-  const finger = s('g', {}, g);
-  s('rect', { x: -40, y: 378, width: 172, height: 44, rx: 22, fill: 'url(#nrn-skin)' }, finger);
-  s('rect', { x: 100, y: 381, width: 24, height: 13, rx: 6.5, fill: '#FBEADF', opacity: 0.9 }, finger);
-  s('path', { d: 'M52,382 q-5,18 0,36 M60,382 q-5,18 0,36', fill: 'none', stroke: '#B98762', 'stroke-width': 1.3, opacity: 0.6 }, finger);
-  const receptor = s('circle', { cx: 124, cy: 404, r: 5.5, fill: '#FFE08A', filter: 'url(#nrn-soft)' }, finger);
-
-  // neurons
-  const N = s('g', { fill: 'none', 'stroke-linecap': 'round' }, g);
-  const sensD = (dx) => `M${124 + dx},404 C${108 + dx},300 170,196 300,170 C380,154 430,154 482,162 C522,168 548,182 572,206`;
-  const pS = s('path', { d: sensD(0), stroke: C.sens, 'stroke-width': 5 }, N);
-  s('line', { x1: 482, y1: 162, x2: 482, y2: 148, stroke: C.sens, 'stroke-width': 4 }, N);
-  s('circle', { cx: 482, cy: 138, r: 11, fill: 'url(#nrn-g-sens)', stroke: 'none' }, N);
-  const pR = s('path', { d: 'M572,206 C588,232 590,258 580,286', stroke: C.relay, 'stroke-width': 4 }, N);
-  s('circle', { cx: 586, cy: 244, r: 7, fill: 'url(#nrn-g-relay)', stroke: 'none' }, N);
-  const pM = s('path', { d: 'M578,294 C540,320 520,340 500,362 C472,394 452,440 440,486', stroke: C.motor, 'stroke-width': 5 }, N);
-  s('circle', { cx: 580, cy: 294, r: 10, fill: 'url(#nrn-g-motor)', stroke: 'none' }, N);
-  const paths = [pS, pR, pM];
-  const lens = paths.map((p) => { try { return p.getTotalLength(); } catch { return 400; } });
-  const trails = paths.map((p, k) => s('path', { d: p.getAttribute('d'), fill: 'none', stroke: C.pulse, 'stroke-width': 3, 'stroke-linecap': 'round', 'stroke-dasharray': `${f1(lens[k] + 80)} ${f1(lens[k] + 80)}`, 'stroke-dashoffset': f1(lens[k] + 80), opacity: 0.85 }, g));
-  const sp = spark(g, 8);
-
-  Lb.l1 = label(finger, { at: [124, 410], to: [30, 470], pos: 'below', anchor: 'start', text: '1. Receptor in skin' });
-  Lb.l2 = label(g, { at: [300, 170], to: [300, 122], pos: 'above', text: '2. Sensory neuron' });
-  Lb.l3 = label(g, { at: [586, 244], to: [705, 132], pos: 'above', text: '3. Relay neuron' });
-  Lb.l4 = label(g, { at: [486, 380], to: [528, 452], pos: 'right', text: '4. Motor neuron' });
-  Lb.l5 = label(g, { at: [360, 470], to: [360, 440], pos: 'above', text: '5. Muscle contracts' });
-  Lb.cord = label(g, { at: [700, 316], to: [736, 386], pos: 'below', text: 'Spinal cord', sub: '(CNS)' });
-
-  // Timeline: 0–500 receptor, 500–2300 sensory, 2300–2900 relay, 2900–4400 motor, 4400–5300 muscle + hand moves.
-  const SEG = [[500, 2300], [2300, 2900], [2900, 4400]];
-  const LBL_T = [0, 600, 2300, 2900, 4400];
-  function run(t) {
-    receptor.setAttribute('r', f1(5.5 + 3 * Math.sin(Math.PI * seg(t, 0, 700))));
-    let shown = 0;
-    SEG.forEach(([a, b], k) => {
-      const u = seg(t, a, b);
-      trails[k].setAttribute('stroke-dashoffset', f1(lens[k] * (1 - u) + 80));
-      if (u > 0 && u < 1) {
-        let p = { x: 0, y: 0 };
-        try { p = paths[k].getPointAtLength(lens[k] * u); } catch { /* ignore */ }
-        place(sp, p.x, p.y); shown = 1;
-      }
-    });
-    sp.setAttribute('opacity', shown);
-    const c = Math.sin(Math.PI * 0.5 * seg(t, 4400, 4900));
-    muscle.setAttribute('transform', `translate(360 492) scale(${(1 - 0.14 * c).toFixed(3)} ${(1 + 0.22 * c).toFixed(3)}) translate(-360 -492)`);
-    const dx = -46 * ease(seg(t, 4500, 5200));
-    finger.setAttribute('transform', `translate(${f1(dx)} 0)`);
-    const d = sensD(dx); pS.setAttribute('d', d); trails[0].setAttribute('d', d);
-    ['l1', 'l2', 'l3', 'l4', 'l5'].forEach((k, i) => Lb[k].classList.toggle('on', t >= LBL_T[i]));
-  }
-  return { g, P: {}, Lb, run, DUR: 5400 };
 }
 
 /* ------------------------------------------------------------------ step plan */
-const ALL = ['dendrites', 'soma', 'nucleus', 'axon', 'myelin', 'terminals'];
 const PLAN = [
-  { scene: 'anat', lit: ALL, labels: [], cap: 'A neuron: one nerve cell' },
-  { scene: 'anat', lit: ['dendrites', 'soma', 'nucleus'], labels: ['dendrites', 'soma', 'nucleus'], cap: 'Dendrites receive signals and carry them to the cell body' },
-  { scene: 'anat', lit: ['axon', 'myelin'], labels: ['axon', 'myelin'], cap: 'The axon carries the signal away from the cell body' },
-  { scene: 'anat', lit: ['terminals', 'next'], labels: ['terminals', 'gap', 'next'], cap: 'Terminal buttons pass the message to the next neuron' },
-  { scene: 'anat', lit: ALL, labels: ['direction'], anim: 'impulse', cap: 'The impulse travels one way: from the dendrites to the terminal buttons' },
-  { scene: 'salt', labels: ['myelin', 'node', 'axon2'], anim: 'race', cap: 'Not to scale. Myelin makes the impulse jump, so it arrives sooner.' },
-  { scene: 'types', lit: ['sensory'], anim: 'sensory', cap: 'Sensory neuron: long dendrite, short axon' },
-  { scene: 'types', lit: ['relay'], anim: 'relay', cap: 'Relay neuron: short dendrites, short axon' },
-  { scene: 'types', lit: ['motor'], anim: 'motor', cap: 'Motor neuron: short dendrites, long axon' },
-  { scene: 'reflex', labels: ['cord'], anim: 'reflex', cap: 'Reflex arc: receptor → sensory → relay → motor → muscle' },
+  { scene: 'anat', view: 'whole', lit: null, labels: ['somaS', 'dendS', 'axonS'], cap: 'A neuron: one nerve cell. This shape is a real reconstruction from a human brain.' },
+  { scene: 'anat', view: 'soma', lit: ['dendrites', 'soma'], nucleus: true, labels: ['dendrites', 'soma', 'nucleus'], anim: 'inflow', cap: 'Dendrites carry signals in towards the cell body, which contains the nucleus.' },
+  { scene: 'anat', view: 'axon', lit: ['axon', 'myelin', 'nodes'], labels: ['axon', 'myelin'], cap: 'The axon carries the signal away from the cell body. Myelin added to show where it sits.' },
+  { scene: 'anat', view: 'terminals', lit: ['terminals', 'next'], labels: ['terminals', 'gap', 'next'], cap: 'Terminal buttons pass the message to the next neuron across a tiny gap. Gap drawn much wider than real.' },
+  { scene: 'anat', view: 'whole', lit: null, labels: ['n1', 'n2', 'n3', 'n4'], anim: 'impulse', cap: 'The impulse travels one way: dendrites → cell body → axon → terminal buttons.' },
+  { scene: 'salt', labels: ['withM', 'sheath', 'node', 'without'], anim: 'race', cap: 'Not to scale. With myelin the impulse jumps from node to node, so it arrives sooner.' },
+  { scene: 'types', row: 'sensory', labels: ['s_skin', 's_dend', 's_soma', 's_axon'], anim: 'sensory', cap: 'Sensory neuron: long dendrite, short axon. Skin ending is real (mouse); the rest is drawn.' },
+  { scene: 'types', row: 'relay', labels: ['r_dend', 'r_soma', 'r_axon'], anim: 'relay', cap: 'Relay neuron: short dendrites, short axon. Real reconstruction from a mouse spinal cord.' },
+  { scene: 'types', row: 'motor', labels: ['m_dend', 'm_soma', 'm_axon', 'm_muscle'], anim: 'motor', cap: 'Motor neuron: short dendrites, long axon. Real rat motor neuron; the axon outside the spinal cord, its myelin and the muscle are drawn.' },
+  { scene: 'reflex', labels: ['x_rec', 'x_sens', 'x_relay', 'x_motor', 'x_muscle', 'x_cord'], anim: 'reflex', cap: 'Reflex arc: receptor → sensory → relay → motor → muscle. Relay and motor cell shapes are real, resized to fit. The long fibres, cord, skin and muscle are drawn.' },
 ];
-const INTRO = { scene: 'anat', lit: ALL, labels: [], cap: 'A neuron (nerve cell)' };
-const RECAP = { scene: 'anat', lit: ALL, labels: ['dendrites', 'nucleus', 'soma', 'axon', 'myelin', 'node', 'terminals'], cap: 'All the parts of a neuron' };
+const INTRO = { scene: 'anat', view: 'whole', lit: null, labels: [], cap: 'A real human neuron. Drag to turn it, scroll or pinch to zoom.' };
+const RECAP = { scene: 'anat', view: 'whole', lit: null, labels: ['dendS', 'somaS', 'axonS', 'myelinS', 'termS'], cap: 'All the parts of a neuron' };
+const NOTES = {
+  anat: 'Real shape · myelin and terminal buttons added',
+  salt: 'Not to scale',
+  types: 'Real shapes · sizes differ: see scale bars',
+  reflex: 'Not to scale · long fibres drawn',
+};
 
 /* ------------------------------------------------------------------ lesson */
 export default {
@@ -611,7 +242,8 @@ export default {
       simple: `<p><span class="keyterm">Sensory neurons</span> carry messages from your senses <strong>to</strong> the central nervous system (CNS). The CNS is your brain and spinal cord.</p>
         <p>They start at <strong>receptors</strong>, for example in your skin, eyes, ears and tongue.</p>
         <p>Shape: <strong>long dendrites</strong> and <strong>short axons</strong>.</p>`,
-      exam: `<p>Sensory neurons carry nerve impulses from sensory receptors in the peripheral nervous system (PNS) to the CNS. Not every message goes all the way to the brain. Some end in the spinal cord, which allows quick reflexes.</p>`,
+      exam: `<p>Sensory neurons carry nerve impulses from sensory receptors in the peripheral nervous system (PNS) to the CNS. Not every message goes all the way to the brain. Some end in the spinal cord, which allows quick reflexes.</p>
+        <p>AQA calls the long fibre from the receptor a <strong>dendrite</strong>, so use that word in the exam. Many scientists call it an axon, because it carries action potentials like an axon does.</p>`,
       callout: { type: 'mistake', title: 'Common mistake', html: '<p>A question may ask which neuron carries impulses <strong>towards the brain</strong> (or the CNS). The answer is the <strong>sensory</strong> neuron, not the relay neuron. This is an easy mistake to make.</p>' },
     },
     {
@@ -658,64 +290,494 @@ export default {
   visual: {
     dark: true,
     async create(container) {
-      const wrap = document.createElement('div');
-      wrap.className = 'fill nrn-vis';
-      const style = document.createElement('style'); style.textContent = CSS; wrap.append(style);
-      container.append(wrap);
-      const svg = s('svg', { viewBox: '0 0 800 600', class: 'diagram', role: 'img', preserveAspectRatio: 'xMidYMid meet' }, wrap);
-      defs(svg);
+      const style = document.createElement('style'); style.textContent = CSS; container.append(style);
+      const loading = document.createElement('div'); loading.className = 'nrn3d-loading'; loading.textContent = 'Loading the 3D neurons…';
+      container.append(loading);
       const controls = document.createElement('div'); controls.className = 'vis-controls'; container.append(controls);
-      const cap = document.createElement('p'); cap.className = 'vis-caption'; container.append(cap);
+      const note = document.createElement('p'); note.className = 'nrn3d-note'; note.hidden = true; container.append(note);
+      const cap = document.createElement('p'); cap.className = 'vis-caption nrn3d-cap'; container.append(cap);
 
-      const scenes = { anat: buildAnatomy(svg), salt: buildSalt(svg), types: buildTypes(svg), reflex: buildReflex(svg) };
-      const tw = makeTweens();
-      let current = null;
+      const stage = createStage(container, {
+        label: 'A 3D neuron',
+        safeTop: () => (controls.childElementCount ? controls.offsetTop + controls.offsetHeight + 6 : 16) + (note.hidden ? 0 : 0),
+        safeBottom: () => container.clientHeight - cap.offsetTop + 6,
+      });
+      container.insertBefore(stage.host, controls);
 
-      const fitLabels = (sc) => Object.values(sc.Lb).forEach((l) => l.fit?.());
-      document.fonts?.ready?.then(() => { if (current) fitLabels(scenes[current.scene]); });
+      const [pyrSwc, motorSwc, relaySwc, skinSwc] = await Promise.all([SWC.pyramidal, SWC.motor, SWC.relay, SWC.skin].map(loadSWC));
+      loading.remove();
 
-      function play(plan) {
-        tw.clear();
-        const sc = scenes[plan.scene];
-        if (plan.anim === 'impulse') tw.add(sc.IMPULSE_DUR, (u) => sc.impulse(u * sc.IMPULSE_DUR));
-        else if (plan.anim === 'race') tw.add(sc.DUR, (u) => sc.race(u * sc.DUR));
-        else if (plan.anim === 'reflex') tw.add(sc.DUR, (u) => sc.run(u * sc.DUR));
-        else if (['sensory', 'relay', 'motor'].includes(plan.anim)) { const d = sc.dur[plan.anim]; tw.add(d, (u) => sc.run(plan.anim, u * d)); }
+      const models = new Set();
+      stage.onFrame((dt) => {
+        updatePixelScale(stage.camera, stage.size.h);
+        let busy = false;
+        for (const m of models) if (m.update(dt)) busy = true;
+        return busy;
+      });
+
+      /* ---------------------------------------------------------------- scene: anatomy (pyramidal neuron) */
+      const scenes = {};
+      function buildAnat() {
+        const g = new THREE.Group(); g.scale.setScalar(0.01);
+        const n = buildNeuron(pyrSwc, { minRadius: 0.7, step: 3, radial: 7, myelin: { start: 42, internode: 70, gap: 10, thickness: 3.2, endPad: 60 }, terminals: { radius: 2.4 } });
+        g.add(n.group); models.add(n);
+        // terminal button inside the densest cluster of endings (for the close-up), and a drawn "next neuron"
+        const dendPts = n.nodes.filter((nd) => nd.type === 3 || nd.type === 4).map((nd) => V(nd.x, nd.y, nd.z));
+        let best = n.terminals[0], bc = -Infinity;
+        for (const t of n.terminals) {
+          if (t.d < n.maxDist.axon * 0.6 || dendPts.some((p) => p.distanceToSquared(t.p) < 90 * 90)) continue;
+          let c = 0; for (const u of n.terminals) if (u !== t && u.p.distanceTo(t.p) < 150) c++;
+          const sc = c + t.d / 1000;
+          if (sc > bc) { bc = sc; best = t; }
+        }
+        const dir = best.dir.clone();
+        const q = new THREE.Vector3().crossVectors(dir, V(0, 0, 1)).normalize();
+        const C = best.p.clone().addScaledVector(dir, best.r + 3.0 + 2.2);
+        const nextNodes = [];
+        for (let i = 0; i <= 10; i++) {
+          const u = i / 10 - 0.5;
+          const p = C.clone().addScaledVector(q, u * 260).addScaledVector(dir, 14 * u * u * 4);
+          nextNodes.push({ id: i + 1, type: 3, x: p.x, y: p.y, z: p.z, r: 2.2 - Math.abs(u) * 0.6, parent: i ? i : -1, drawn: true });
+        }
+        const next = buildNeuron({ nodes: nextNodes }, { minRadius: 1, terminals: false, nucleus: false, colors: { dendrites: '#8FB0F0' } });
+        g.add(next.group); models.add(next);
+        const box = n.box();
+        const bar = scaleBar(100, V(box.min.x / 0.01 - 160, box.min.y / 0.01 + 60, 0), 1);
+        g.add(bar);
+        // anchors
+        const soma = n.soma;
+        const dendNear = (lo, hi, pref = V(0, 1, 0)) => {
+          let b = null, bs = -Infinity;
+          for (const nd of n.nodes) {
+            if (nd.type !== 3 && nd.type !== 4) continue;
+            const d = n.D.get(nd.id); if (d < lo || d > hi) continue;
+            const p = V(nd.x, nd.y, nd.z).sub(soma.center);
+            const s2 = p.normalize().dot(pref);
+            if (s2 > bs) { bs = s2; b = nd; }
+          }
+          return b ? V(b.x, b.y, b.z) : soma.center.clone();
+        };
+        const W = (p) => n.toWorld(p);
+        const A = {
+          somaC: soma.center.clone(),
+          dendClose: dendNear(34, 52, V(-0.9, 0.3, 0.2).normalize()),
+          dendFar: dendNear(150, 260, V(-0.7, 0.6, 0).normalize()),
+          apical: dendNear(380, 600, V(0, 1, 0)),
+          nucleusP: soma.center.clone().add(V(-soma.radius * 0.25, -soma.radius * 0.1, soma.radius * 0.3)),
+        };
+        const sheath1 = n.myelin.sheaths[1] || n.myelin.sheaths[0];
+        const node1 = n.myelin.nodes[1] || n.myelin.nodes[0];
+        const ais = n.mainPath ? n.mainPath.p[Math.min(n.mainPath.p.length - 1, 14)] : soma.center;
+        const LBL = {
+          somaS: { text: 'Cell body', at: () => W(A.somaC), side: 'right', dist: 90 },
+          dendS: { text: 'Dendrites', at: () => W(A.apical), side: 'left' },
+          axonS: { text: 'Axon', at: () => n.anchor('axonMid'), side: 'right' },
+          myelinS: { text: 'Myelin sheath', tag: 'added to show where it sits', drawn: true, at: () => W(sheath1.mid), side: 'left' },
+          termS: { text: 'Terminal buttons', tag: 'drawn at the axon ends', drawn: true, at: () => W(best.p), side: 'right' },
+          dendrites: { text: 'Dendrites', sub: 'receive signals', at: () => W(A.dendClose), side: 'left', dist: 80 },
+          soma: { text: 'Cell body (soma)', at: () => W(soma.center.clone().add(V(soma.radius * 0.7, soma.radius * 0.4, 0))), side: 'right', dist: 80 },
+          nucleus: { text: 'Nucleus', sub: 'holds the DNA', tag: 'drawn', at: () => W(A.nucleusP), side: 'bottom', dist: 70 },
+          axon: { text: 'Axon', sub: 'carries the signal away', at: () => W(ais), side: 'right', dist: 70 },
+          myelin: { text: 'Myelin sheath', tag: 'added to show where it sits', drawn: true, at: () => W(sheath1.mid), side: 'left', dist: 70 },
+          node: { text: 'Node of Ranvier', at: () => W(node1.p), side: 'right' },
+          terminals: { text: 'Terminal button', tag: 'drawn at the axon ends', drawn: true, at: () => W(best.p.clone().addScaledVector(dir, -best.r * 0.3)), side: 'left', dist: 80 },
+          gap: { text: 'Tiny gap', sub: 'part of the synapse', at: () => W(best.p.clone().addScaledVector(dir, best.r + 1.5)), side: 'right', dist: 90 },
+          next: { text: 'Next neuron', tag: 'drawn', drawn: true, at: () => W(C.clone().addScaledVector(q, 30)), side: 'bottom', dist: 60 },
+          n1: { text: '1 Dendrites', at: () => W(A.apical), side: 'left' },
+          n2: { text: '2 Cell body', at: () => W(A.somaC), side: 'right', dist: 90 },
+          n3: { text: '3 Axon', at: () => n.anchor('axonMid'), side: 'right' },
+          n4: { text: '4 Terminal buttons', tag: 'drawn at the axon ends', drawn: true, at: () => W(best.p), side: 'right' },
+          bar: { text: '100 µm (0.1 mm)', plain: true, line: false, at: () => g.localToWorld(bar.userData.mid.clone()), side: 'bottom', dist: 10 },
+        };
+        const VIEWS = {
+          whole: () => ({ box: n.box(), dir: V(0.18, 0.08, 1) }),
+          soma: () => { const c = W(soma.center); const r = 0.3; return { box: new THREE.Box3(c.clone().subScalar(r), c.clone().addScalar(r)), dir: V(-0.25, 0.1, 1) }; },
+          axon: () => {
+            const b = new THREE.Box3(); b.expandByPoint(W(soma.center.clone().addScalar(25))); b.expandByPoint(W(soma.center.clone().addScalar(-25)));
+            for (let i = 0; i < n.mainPath.p.length; i++) if (n.mainPath.d[i] < 240) b.expandByPoint(W(n.mainPath.p[i]));
+            return { box: b, dir: V(0.35, 0.05, 1) };
+          },
+          terminals: () => { const c = W(best.p); const r = 0.3; return { box: new THREE.Box3(c.clone().subScalar(r), c.clone().addScalar(r)), dir: V(0, 0, 1).addScaledVector(dir, -0.15) }; },
+        };
+        const spark = createSpark(undefined, 0.55);
+        return { group: g, n, next, LBL, VIEWS, bar, spark, sparks: [spark] };
       }
+
+      /* ---------------------------------------------------------------- scene: myelin race */
+      function buildSalt() {
+        const g = new THREE.Group(); g.scale.setScalar(0.01);
+        const L = 900;
+        const top = buildNeuron({ nodes: straightAxonNodes(L, { radius: 9, step: 30, start: V(-L / 2, 70, 0) }) },
+          { minRadius: 9, step: 8, radial: 20, myelin: { start: 20, internode: 96, gap: 16, thickness: 2.0, endPad: 26 }, terminals: { radius: 17 } });
+        const bot = buildNeuron({ nodes: straightAxonNodes(L, { radius: 9, step: 30, start: V(-L / 2, -70, 0) }) },
+          { minRadius: 9, step: 8, radial: 20, terminals: { radius: 17 } });
+        g.add(top.group, bot.group); models.add(top); models.add(bot);
+        const W = (m, p) => m.toWorld(p);
+        const LBL = {
+          withM: { text: 'With myelin', sub: 'jumps from node to node', at: () => W(top, V(-L / 2 + 4, 70, 0)), side: 'top', dist: 60 },
+          sheath: { text: 'Myelin sheath', at: () => W(top, top.myelin.sheaths[2].mid), side: 'top', dist: 60 },
+          node: { text: 'Node of Ranvier', sub: 'a gap in the myelin', at: () => W(top, top.myelin.nodes[4].p), side: 'top', dist: 60 },
+          without: { text: 'Without myelin', sub: 'travels along every part', at: () => W(bot, V(-L / 2 + 4, -70, 0)), side: 'bottom', dist: 60 },
+          first: { text: 'Arrives first', at: () => W(top, V(L / 2, 70, 0)), side: 'top', dist: 60 },
+        };
+        const box = new THREE.Box3(W(bot, V(-L / 2 - 20, -150, -30)), W(top, V(L / 2 + 20, 150, 30)));
+        return { group: g, top, bot, LBL, VIEWS: { main: () => ({ box, dir: V(0.05, 0.22, 1) }) }, L };
+      }
+
+      /* ---------------------------------------------------------------- scene: the three types */
+      function buildTypes() {
+        const g = new THREE.Group();
+        // sensory: real skin ending + drawn fibre, cell body (DRG) and T-junction
+        const sK = 0.0024;
+        const sg = new THREE.Group(); sg.scale.setScalar(sK); sg.position.set(-4.6, 3.3, 0);
+        const arbor = new THREE.Matrix4().makeRotationZ(Math.PI / 2);
+        const periph = [];
+        for (let i = 0; i <= 12; i++) { const x = (i / 12) * 2300; periph.push(V(x, Math.sin(i * 0.9) * 18, Math.cos(i * 0.7) * 10)); }
+        const T = periph[periph.length - 1];
+        const sens = sensoryNodes(skinSwc, {
+          arbor, periph, soma: T.clone().add(V(-10, 190, 0)), somaR: 20,
+          central: [T.clone(), T.clone().add(V(220, -10, 0)), T.clone().add(V(480, 0, 0)), T.clone().add(V(640, -6, 0))],
+        });
+        const sensory = buildNeuron({ nodes: sens.nodes }, { minRadius: 1.4, step: 6, terminals: { radius: 9 }, nucleus: false });
+        sensory.setDirection('dendrites', 1);
+        sg.add(sensory.group); models.add(sensory);
+        const sBar = scaleBar(500, V(-1250, -470, 0), 1); sg.add(sBar);
+        g.add(sg);
+
+        // relay: real mouse spinal interneuron, turned on its side
+        const rK = 0.0062;
+        const rg = new THREE.Group(); rg.scale.setScalar(rK); rg.position.set(0, -0.15, 0); rg.rotation.z = -Math.PI / 2;
+        const relay = buildNeuron(relaySwc, { minRadius: 0.55, step: 2, radial: 6, terminals: { radius: 2.4 }, nucleus: false });
+        rg.add(relay.group); models.add(relay);
+        const rBar = scaleBar(100, V(-160, 220, 0), 1); const rBarG = new THREE.Group(); rBarG.add(rBar); rBarG.rotation.z = Math.PI / 2; rg.add(rBarG);
+        g.add(rg);
+
+        // motor: real rat motor neuron; the axon leaves the spinal cord, so its continuation is drawn
+        const mK = 0.00125;
+        const mg = new THREE.Group(); mg.scale.setScalar(mK); mg.position.set(-3.7, -3.5, 0); mg.rotation.y = Math.PI;
+        const mNodes = motorSwc.nodes.map((nd) => ({ ...nd }));
+        const tip0 = mainAxonTip(mNodes);
+        const t0 = V(tip0.x, tip0.y, tip0.z);
+        const ext = extendAxon(mNodes, [t0.clone().add(V(-500, 120, 0)), t0.clone().add(V(-2000, 260, 0)), t0.clone().add(V(-3800, 140, 0)), t0.clone().add(V(-5200, 60, 0))], { r: 2.2, twigs: 5, twigLen: 160 });
+        const motor = buildNeuron({ nodes: mNodes }, { minRadius: 0.9, step: 6, radial: 6, myelin: { start: 900, internode: 420, gap: 55, thickness: 2.6, endPad: 280 }, terminals: { radius: 22 }, nucleus: false });
+        mg.add(motor.group); models.add(motor);
+        const muscle = muscleMesh(1700, 380);
+        muscle.position.copy(ext.end).add(V(-520, -330, 0)); muscle.rotation.z = 0.12;
+        mg.add(muscle);
+        const mBar = scaleBar(500, V(800, -950, 0), 1); mBar.rotation.y = Math.PI; mg.add(mBar);
+        g.add(mg);
+
+        const S = (m, p) => m.toWorld(p);
+        const sAt = (part) => {
+          if (part === 'skin') { const b = new THREE.Vector3(); let k = 0; for (const nd of sens.nodes) if (nd.arbor) { b.add(V(nd.x, nd.y, nd.z)); k++; } return b.divideScalar(k); }
+          return null;
+        };
+        const skinC = sAt('skin');
+        const motorSoma = motor.soma.center.clone();
+        const motorDend = (() => { let b = null, bs = -1; for (const nd of motor.nodes) { if (nd.type !== 3) continue; const d = motor.D.get(nd.id); if (d > 250 && d < 450 && nd.y > bs) { bs = nd.y; b = nd; } } return b ? V(b.x, b.y, b.z) : motorSoma; })();
+        const relaySoma = relay.soma.center.clone();
+        const relayDend = (() => { let b = null, bs = -1; for (const nd of relay.nodes) { if (nd.type !== 3) continue; const d = relay.D.get(nd.id); if (d > bs) { bs = d; b = nd; } } return V(b.x, b.y, b.z); })();
+        const relayAx = relay.anchorLocal('axonMid');
+        const LBL = {
+          s_skin: { text: 'Receptor ending in the skin', tag: 'real reconstruction (mouse)', at: () => S(sensory, skinC), side: 'bottom', dist: 70 },
+          s_dend: { text: 'Long dendrite', sub: 'from the receptor', tag: 'drawn, and much longer in real life. Scientists often call this fibre an axon too', drawn: true, at: () => S(sensory, periph[6]), side: 'bottom', dist: 60 },
+          s_soma: { text: 'Cell body', sub: 'in a ganglion next to the spinal cord', tag: 'drawn', drawn: true, at: () => S(sensory, sens.somaNode && V(sens.somaNode.x, sens.somaNode.y, sens.somaNode.z)), side: 'top', dist: 60 },
+          s_axon: { text: 'Short axon', sub: 'into the spinal cord', tag: 'drawn', drawn: true, at: () => S(sensory, T.clone().add(V(380, 0, 0))), side: 'bottom', dist: 70 },
+          r_dend: { text: 'Short dendrites', at: () => S(relay, relayDend), side: 'top', dist: 60 },
+          r_soma: { text: 'Cell body', at: () => S(relay, relaySoma), side: 'bottom', dist: 80 },
+          r_axon: { text: 'Short axon', sub: 'stays inside the spinal cord', at: () => S(relay, relayAx), side: 'top', dist: 70 },
+          m_dend: { text: 'Short dendrites', sub: 'compared with the axon', at: () => S(motor, motorDend), side: 'top', dist: 50 },
+          m_soma: { text: 'Cell body', sub: 'in the spinal cord', at: () => S(motor, motorSoma), side: 'bottom', dist: 70 },
+          m_axon: { text: 'Long axon', sub: 'in a human leg it can be about 1 metre long', tag: 'drawn here much shorter', drawn: true, at: () => S(motor, ext.realTip.clone().lerp(ext.end, 0.55)), side: 'top', dist: 60 },
+          m_muscle: { text: 'Muscle (effector)', tag: 'drawn', drawn: true, at: () => mg.localToWorld(muscle.position.clone()), side: 'bottom', dist: 50 },
+          b_s: { text: '500 µm (0.5 mm)', plain: true, line: false, at: () => sg.localToWorld(sBar.userData.mid.clone()), side: 'bottom', dist: 6 },
+          b_r: { text: '100 µm (0.1 mm)', plain: true, line: false, at: () => rBarG.localToWorld(rBar.userData.mid.clone()), side: 'bottom', dist: 6 },
+          b_m: { text: '500 µm (0.5 mm)', plain: true, line: false, at: () => mBar.localToWorld(mBar.userData.mid.clone()), side: 'bottom', dist: 6 },
+        };
+        const rowBox = (m, extra = []) => { const b = m.box(); extra.forEach((p) => b.expandByPoint(p)); return b; };
+        const VIEWS = {
+          sensory: () => ({ box: rowBox(sensory), dir: V(0, 0.12, 1) }),
+          relay: () => ({ box: rowBox(relay).expandByScalar(0.15), dir: V(0, 0.12, 1) }),
+          motor: () => { const b = rowBox(motor); b.expandByObject(muscle); return { box: b, dir: V(0, 0.12, 1) }; },
+        };
+        const sPath = polyline([...periph, ...[T.clone().add(V(220, -10, 0)), T.clone().add(V(480, 0, 0)), T.clone().add(V(640, -6, 0))]], (p) => sensory.toWorld(p));
+        const sparks = { sensory: createSpark(undefined, 0.42), relay: createSpark(undefined, 0.3), motor: createSpark(undefined, 0.42) };
+        return { group: g, sensory, relay, motor, muscle, LBL, VIEWS, rows: { sensory: sg, relay: rg, motor: mg }, bars: { sensory: sBar, relay: rBarG, motor: mBar }, sparks: Object.values(sparks), spark: sparks, sPath };
+      }
+
+      /* ---------------------------------------------------------------- scene: reflex arc */
+      function buildReflex() {
+        const g = new THREE.Group();
+        const mat = (c, o = {}) => tissueMaterial(c, o);
+        // spinal cord: white matter (oval) with the butterfly of grey matter on the cut face
+        const half = [[0, 0.55], [0.22, 0.6], [0.4, 0.85], [0.55, 1.25], [0.7, 1.7], [0.85, 2.0], [1.0, 2.08], [1.08, 1.95], [0.98, 1.6], [0.85, 1.2],
+          [0.82, 0.8], [1.0, 0.55], [1.35, 0.35], [1.5, 0.1], [1.6, -0.3], [1.9, -0.7], [2.0, -1.15], [1.82, -1.55], [1.4, -1.7], [0.95, -1.55], [0.6, -1.15],
+          [0.38, -0.7], [0.2, -0.48], [0, -0.42]];
+        const grey = new THREE.Shape();
+        half.forEach(([x, y], i) => (i ? grey.lineTo(x, y) : grey.moveTo(x, y)));
+        for (let i = half.length - 1; i >= 0; i--) grey.lineTo(-half[i][0], half[i][1]);
+        const greyPts = grey.getPoints(); const smoothGrey = new THREE.Shape(new THREE.SplineCurve(greyPts.map((p) => new THREE.Vector2(p.x, p.y))).getPoints(220));
+        const white = new THREE.Shape(); white.absellipse(0, 0, 3.0, 2.35, 0, Math.PI * 2, false, 0);
+        const notch = new THREE.Path(); notch.absellipse(0, 0.12, 0.09, 0.09, 0, Math.PI * 2, false, 0);
+        smoothGrey.holes.push(notch);
+        const depth = 2.6;
+        const wg = new THREE.ExtrudeGeometry(white, { depth, bevelEnabled: true, bevelThickness: 0.12, bevelSize: 0.12, bevelSegments: 4, curveSegments: 72 });
+        wg.translate(0, 0, -depth);
+        const cord = new THREE.Mesh(wg, mat('#F1E3D3', { roughness: 0.6 }));
+        const gg = new THREE.ExtrudeGeometry(smoothGrey, { depth: 0.05, bevelEnabled: false });
+        gg.translate(0, 0, 0.1);
+        const greyM = new THREE.Mesh(gg, mat('#B98A93', { roughness: 0.6 }));
+        g.add(cord, greyM);
+        // nerves: translucent sheaths so the fibres inside can be seen
+        const nerveMat = new THREE.MeshStandardMaterial({ color: '#F4E7C2', roughness: 0.95, metalness: 0, transparent: true, opacity: 0.12, depthWrite: false, envMapIntensity: 0.3 });
+        const tube = (pts, r) => new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 64, r, 20, false), nerveMat);
+        const z0 = -0.5;
+        const DRG = V(3.5, 2.6, z0);
+        const dorsal = [V(1.0, 2.05, z0), V(2.2, 2.72, z0), DRG.clone(), V(4.4, 1.55, z0), V(5.0, 0.95, z0)];
+        const ventral = [V(1.75, -1.75, z0), V(3.0, -1.55, z0), V(4.3, -0.35, z0), V(5.0, 0.6, z0)];
+        const spinal = [V(4.9, 0.8, z0), V(5.8, 0.82, z0), V(6.6, 0.8, z0)];
+        const toSkin = [V(6.5, 0.85, z0), V(7.2, 1.6, z0), V(7.8, 2.7, z0), V(8.1, 3.25, z0)];
+        const toMuscle = [V(6.5, 0.75, z0), V(7.3, -0.3, z0), V(7.7, -1.5, z0)];
+        g.add(tube(dorsal, 0.2), tube(ventral, 0.2), tube(spinal, 0.28), tube(toSkin, 0.18), tube(toMuscle, 0.2));
+        const drg = new THREE.Mesh(new THREE.SphereGeometry(1, 40, 28), new THREE.MeshPhysicalMaterial({ color: '#F2DDB0', roughness: 0.5, transparent: true, opacity: 0.28, depthWrite: false }));
+        drg.scale.set(0.6, 0.42, 0.42); drg.position.copy(DRG); g.add(drg);
+        // skin (a slab) with a hot object on it, and a muscle
+        const skinG = new THREE.BoxGeometry(3.2, 0.45, 2.4, 1, 1, 1);
+        const skin = new THREE.Mesh(skinG, new THREE.MeshPhysicalMaterial({ color: '#E7B9A3', roughness: 0.6, transparent: true, opacity: 0.55, depthWrite: false, sheen: 0.4, sheenColor: new THREE.Color('#ffe2dc') }));
+        skin.position.set(8.8, 3.55, z0); g.add(skin);
+        const hotMat = new THREE.MeshStandardMaterial({ color: '#FF7A3D', emissive: new THREE.Color('#FF5A1F'), emissiveIntensity: 0.6, roughness: 0.4 });
+        const hot = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.85, 0.32, 40), hotMat);
+        hot.position.set(9.0, 4.15, z0); g.add(hot);
+        const muscle = muscleMesh(2.6, 0.72);
+        muscle.position.set(8.75, -2.2, z0); muscle.rotation.z = -0.15; g.add(muscle);
+
+        // neurons (µm inside each group; each group scaled to fit)
+        const k = 0.0016;
+        const sg = new THREE.Group(); sg.scale.setScalar(k); g.add(sg);
+        const L = (p) => p.clone().divideScalar(k);
+        const skinPts = new THREE.CatmullRomCurve3([...toSkin].reverse().map((p) => p.clone().add(V(0, 0, 0.12))));
+        const nervePts = new THREE.CatmullRomCurve3([...spinal].reverse().map((p) => p.clone().add(V(0, 0.05, 0.12))));
+        const dorsPts = new THREE.CatmullRomCurve3([...dorsal].reverse().map((p) => p.clone().add(V(0, 0.04, 0.12))));
+        const periph = [];
+        const pushCurve = (c, from, to, n) => { for (let i = 0; i <= n; i++) periph.push(L(c.getPoint(from + ((to - from) * i) / n))); };
+        periph.push(L(V(8.4, 3.45, z0 + 0.12)));
+        pushCurve(skinPts, 0, 1, 10);
+        pushCurve(nervePts, 0.05, 1, 6);
+        const tDrg = 0.5;
+        pushCurve(dorsPts, 0.05, tDrg, 8);
+        const T = periph[periph.length - 1];
+        const arbor = new THREE.Matrix4().makeRotationX(-Math.PI / 2).premultiply(new THREE.Matrix4().makeRotationY(0.6)).premultiply(new THREE.Matrix4().makeScale(0.75, 0.75, 0.75)).setPosition(periph[0]);
+        const central = [T.clone()];
+        for (let i = 1; i <= 6; i++) central.push(L(dorsPts.getPoint(tDrg + ((1 - tDrg) * i) / 6)));
+        central.push(L(V(0.95, 1.55, z0 + 0.62)), L(V(0.85, 0.95, 0.22)), L(V(0.8, 0.55, 0.22)));
+        const sens = sensoryNodes(skinSwc, { arbor: arbor.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, 0)), periph: periph.slice(), soma: T.clone().add(V(0, 95, 0)), somaR: 55, central, fibreR: 3, twigs: 3 });
+        // the matrix above was built with setPosition(periph[0]) so the arbor root sits at the skin entry point
+        const sensory = buildNeuron({ nodes: sens.nodes }, { minRadius: 2, minPx: 1.7, step: 20, terminals: { radius: 30 }, nucleus: false, colors: { dendrites: '#E7A2D6', axon: '#E7A2D6', soma: '#F0A0C8', terminals: '#FFC65C' } });
+        sensory.setDirection('dendrites', 1);
+        sg.add(sensory.group); models.add(sensory);
+
+        // relay neuron in the grey matter between the horns
+        const rg = new THREE.Group(); rg.scale.setScalar(0.0027); rg.position.set(0.78, 0.05, 0.25); rg.rotation.set(0, 0, 0.25);
+        const relay = buildNeuron(relaySwc, { minRadius: 0.6, minPx: 1.4, step: 3, radial: 6, terminals: { radius: 6 }, nucleus: false, colors: { dendrites: '#9FD3A5', axon: '#9FD3A5', soma: '#A9E0AE', terminals: '#FFC65C' } });
+        rg.add(relay.group); models.add(relay); g.add(rg);
+
+        // motor neuron in the ventral horn; its axon is drawn out through the ventral root to the muscle
+        const mg = new THREE.Group(); mg.scale.setScalar(0.00115); mg.position.set(1.4, -1.2, 0.25); mg.rotation.set(0, Math.PI, -0.35);
+        g.add(mg); mg.updateMatrixWorld(true); g.updateMatrixWorld(true);
+        const mNodes = motorSwc.nodes.map((nd) => ({ ...nd }));
+        const toLocal = (p) => mg.worldToLocal(g.localToWorld(p.clone()));
+        const vPts = new THREE.CatmullRomCurve3(ventral.map((p) => p.clone().add(V(0, 0.03, 0.1))));
+        const mPts = new THREE.CatmullRomCurve3(toMuscle.map((p) => p.clone().add(V(0, -0.04, 0.1))));
+        const route = [];
+        for (let i = 1; i <= 6; i++) route.push(toLocal(vPts.getPoint(i / 6)));
+        route.push(toLocal(V(5.8, 0.74, z0 + 0.1)));
+        for (let i = 0; i <= 5; i++) route.push(toLocal(mPts.getPoint(i / 5)));
+        route.push(toLocal(V(7.95, -1.85, z0 + 0.2)));
+        const ext = extendAxon(mNodes, route, { r: 3, twigs: 5, twigLen: 380 });
+        const motor = buildNeuron({ nodes: mNodes }, { minRadius: 1.2, minPx: 1.5, step: 10, radial: 6, myelin: { start: 1200, internode: 900, gap: 120, thickness: 2.6, endPad: 700 }, terminals: { radius: 50 }, nucleus: false, colors: { dendrites: '#8FC0F5', axon: '#8FC0F5', soma: '#9CC9FA' } });
+        mg.add(motor.group); models.add(motor);
+
+        const W = (m, p) => m.toWorld(p);
+        const LBL = {
+          x_rec: { text: 'Receptor in the skin', sub: 'detects the heat', at: () => g.localToWorld(V(8.3, 3.5, z0 + 0.3)), side: 'left', dist: 90 },
+          x_hot: { text: 'Hot object', plain: true, line: false, at: () => g.localToWorld(V(9.0, 4.4, z0)), side: 'top', dist: 6 },
+          x_sens: { text: 'Sensory neuron', at: () => W(sensory, periph[14]), side: 'top', dist: 60, color: '#E7A2D6' },
+          x_relay: { text: 'Relay neuron', sub: 'in the spinal cord', at: () => W(relay, relay.soma.center), side: 'top', dist: 120, offset: [-120, 0], color: '#9FD3A5' },
+          x_motor: { text: 'Motor neuron', at: () => W(motor, motor.soma.center), side: 'bottom', dist: 110, color: '#8FC0F5' },
+          x_muscle: { text: 'Muscle (effector)', sub: 'contracts', at: () => g.localToWorld(V(9.0, -2.45, z0 + 0.4)), side: 'bottom', dist: 50 },
+          x_cord: { text: 'Spinal cord', sub: 'cut across', at: () => g.localToWorld(V(-2.3, 1.0, 0.1)), side: 'top', dist: 70 },
+        };
+        const box = new THREE.Box3(V(-3.2, -3.1, -1), V(10.2, 4.5, 0.5));
+        const sPath = polyline([...periph, ...central.slice(1)], (p) => sensory.toWorld(p));
+        const sparks = { sensory: createSpark(undefined, 0.5), relay: createSpark(undefined, 0.42), motor: createSpark(undefined, 0.5) };
+        return { group: g, sensory, relay, motor, muscle, hot, hotMat, LBL, VIEWS: { main: () => ({ box, dir: V(0.12, 0.1, 1) }) }, periph, ext, sparks: Object.values(sparks), spark: sparks, sPath };
+      }
+
+      /* ---------------------------------------------------------------- animations */
+      let anim = null;
+      stage.onFrame((dt) => {
+        if (!anim) return false;
+        anim.t += dt;
+        const done = anim.t >= anim.dur;
+        anim.fn(Math.min(anim.t, anim.dur));
+        if (done) { const a = anim; anim = null; a.done?.(); }
+        return true;
+      });
+      function play(dur, fn, { still = dur, done } = {}) {
+        if (reducedMotion()) { anim = null; fn(still); done?.(); stage.requestRender(); return; }
+        anim = { t: 0, dur, fn, done }; fn(0);
+      }
+      const glowOn = () => (get('calm') === 'true' ? 0.75 : 1);
+
+      // a neuron's standard sequence: signals flow in along dendrites → cell body → out along the axon
+      function neuronSequence(m, t, { dIn = 1.2, soma = 0.5, out = 2.4, delay = 0, axonWidth = 34, dendWidth = 40, spark = null } = {}) {
+        const G = glowOn();
+        const u1 = seg(t, delay, delay + dIn), u2 = seg(t, delay + dIn, delay + dIn + soma), u3 = seg(t, delay + dIn + soma * 0.6, delay + dIn + soma * 0.6 + out);
+        const dMax = m.maxDist.dendrites;
+        m.setFront('dendrites', dMax * (1 - u1) - 10, t > delay && u1 < 1 ? G : u1 >= 1 ? G * Math.max(0, 1 - (t - delay - dIn) * 2.5) : 0, dendWidth);
+        m.setFront('soma', 0, (t > delay + dIn * 0.85 ? Math.sin(Math.PI * Math.min(1, u2 * 0.999 + (u3 > 0 ? 0.3 * u3 : 0))) : 0) * G * 0.9);
+        if (u3 > 0) m.setFront('axon', m.axonFrontAt(u3), G, axonWidth); else m.setFront('axon', -1e6, 0);
+        if (spark) {
+          spark.visible = u3 > 0 && u3 < 1;
+          if (spark.visible) spark.position.copy(m.pointAt(m.axonFrontAt(u3)));
+        }
+      }
+
+      /* ---------------------------------------------------------------- show */
+      let current = null;
+      const offInteract = stage.onInteract(() => { if (!controls.querySelector('[data-reset]')) addResetBtn(); });
+      function addResetBtn() {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'nrn3d-btn'; b.dataset.reset = '';
+        b.textContent = '⟲ Reset view'; b.addEventListener('click', () => { b.remove(); frame(current, false); });
+        controls.append(b);
+      }
+      function sceneOf(name) {
+        if (!scenes[name]) {
+          const sc = { anat: buildAnat, salt: buildSalt, types: buildTypes, reflex: buildReflex }[name]();
+          const wrap = new THREE.Group(); wrap.add(sc.group, ...(sc.sparks || []));
+          sc.group = wrap; scenes[name] = sc;
+          stage.root.add(wrap);
+        }
+        return scenes[name];
+      }
+      function frame(plan, instant) {
+        const sc = sceneOf(plan.scene);
+        const v = plan.scene === 'anat' ? sc.VIEWS[plan.view]() : plan.scene === 'types' ? sc.VIEWS[plan.row]() : sc.VIEWS.main();
+        stage.fit(v.box, { dir: v.dir, padding: plan.scene === 'anat' && plan.view !== 'whole' ? 1.12 : 1.06, instant });
+      }
+      function setLabels(sc, keys) { stage.labels.set(keys.filter((k) => sc.LBL[k]).map((k) => ({ key: k, ...sc.LBL[k] }))); }
 
       function show(step) {
         const plan = step < 0 ? INTRO : step >= PLAN.length ? RECAP : PLAN[step];
+        const prev = current;
         current = plan;
-        tw.clear();
-        wrap.classList.toggle('calm', get('calm') === 'true');
-        for (const [k, sc] of Object.entries(scenes)) sc.g.style.display = k === plan.scene ? '' : 'none';
-        const sc = scenes[plan.scene];
-        for (const [k, el] of Object.entries(sc.P)) {
-          const on = !plan.lit || plan.lit.includes(k);
-          el.classList.toggle('dim', !on);
-          if (k === 'next') el.classList.toggle('gone', !on);
-        }
-        for (const [k, el] of Object.entries(sc.Lb)) if (!/^l\d$/.test(k)) el.classList.toggle('on', (plan.labels || []).includes(k));
-        fitLabels(sc);
-        // reset any effects before playing
-        if (plan.scene === 'anat') sc.clearFx();
-        if (plan.scene === 'types') sc.run(null, 0);
-        if (plan.scene === 'salt') sc.race(0);
-        if (plan.scene === 'reflex') sc.run(0);
-        cap.textContent = plan.cap;
-        svg.setAttribute('aria-label', plan.cap);
+        anim = null;
+        const sc = sceneOf(plan.scene);
+        for (const [k, s2] of Object.entries(scenes)) s2.group.visible = k === plan.scene;
+        (sc.sparks || []).forEach((sp) => { sp.visible = false; });
         controls.innerHTML = '';
-        if (plan.anim) {
-          if (!reducedMotion()) {
-            const b = document.createElement('button'); b.type = 'button'; b.textContent = '↻ Play again';
-            b.addEventListener('click', () => play(plan));
-            controls.append(b);
+        note.textContent = NOTES[plan.scene]; note.hidden = false;
+        cap.textContent = plan.cap; stage.setLabel(plan.cap);
+        stage.setAO(false);   // screen-space AO leaves dark blocks around thin tubes
+
+        if (plan.scene === 'anat') {
+          const n = sc.n;
+          n.clearSignals();
+          n.highlight(plan.lit, { instant: prev?.scene !== 'anat' });
+          sc.next.highlight(plan.lit && !plan.lit.includes('next') ? [] : null);
+          sc.next.group.visible = plan.view === 'terminals';
+          n.showNucleus(!!plan.nucleus);
+          sc.bar.visible = plan.view === 'whole';
+          setLabels(sc, [...plan.labels, ...(plan.view === 'whole' ? ['bar'] : [])]);
+          if (plan.anim === 'inflow') {
+            const run = () => play(2.6, (t) => {
+              const u = seg(t, 0, 2.0);
+              n.setFront('dendrites', 150 * (1 - u) - 6, glowOn() * (u < 1 ? 1 : 0), 22);
+              n.setFront('soma', 0, glowOn() * 0.8 * Math.sin(Math.PI * seg(t, 1.6, 2.6)));
+            }, { still: 2.6 });
+            addPlay(run); run();
+          } else if (plan.anim === 'impulse') {
+            const run = () => play(5.4, (t) => neuronSequence(n, t, { dIn: 1.5, soma: 0.6, out: 3.2, axonWidth: 45, dendWidth: 90, spark: sc.spark }), { still: 5.4 });
+            addPlay(run); run();
           }
-          play(plan);
+        } else if (plan.scene === 'salt') {
+          const { top, bot, L } = sc;
+          const T1 = 4.2, T2 = 8.8;
+          setLabels(sc, plan.labels);
+          const run = () => play(T2 + 0.4, (t) => {
+            const G = glowOn();
+            const u1 = clamp(t / T1), u2 = clamp(t / T2);
+            top.setFront('axon', u1 < 1 ? top.axonFrontAt(u1) : L, G, u1 < 1 ? 18 : 30);
+            bot.setFront('axon', u2 * L, G, 34);
+            setLabels(sc, t >= T1 ? [...plan.labels, 'first'] : plan.labels);
+          }, { still: T1 });
+          addPlay(run); run();
+        } else if (plan.scene === 'types') {
+          const ms = { sensory: sc.sensory, relay: sc.relay, motor: sc.motor };
+          for (const [k, m] of Object.entries(ms)) { m.clearSignals(); m.highlight(k === plan.row ? null : [], { instant: prev?.scene !== 'types' }); }
+          sc.muscle.material.userData.dim = plan.row !== 'motor';
+          sc.muscle.material.color.set(plan.row === 'motor' ? '#C4505C' : '#5A4650');
+          for (const [k, b] of Object.entries(sc.bars)) b.visible = k === plan.row;
+          setLabels(sc, [...plan.labels, { sensory: 'b_s', relay: 'b_r', motor: 'b_m' }[plan.row]]);
+          const m = ms[plan.row];
+          let run;
+          if (plan.row === 'sensory') {
+            const dmin = Math.min(...m.nodes.map((nd) => nd.d)), dmax = Math.max(...m.nodes.map((nd) => nd.d));
+            run = () => play(4.0, (t) => {
+              const G = glowOn(); const u = clamp(t / 3.6);
+              const f = dmin + (dmax - dmin) * u;
+              m.setFront('dendrites', f, u < 1 ? G : 0, 90); m.setFront('axon', f, u < 1 ? G : 0, 90);
+              m.setFront('soma', 0, G * 0.8 * Math.sin(Math.PI * seg(f, 2150, 2700)));
+              const sp = sc.spark.sensory; sp.visible = f >= 0 && u < 1; if (sp.visible) sp.position.copy(sc.sPath.at(f));
+            }, { still: 3.4 });
+          } else if (plan.row === 'relay') {
+            run = () => play(3.6, (t) => neuronSequence(m, t, { dIn: 1.0, soma: 0.5, out: 1.8, axonWidth: 40, dendWidth: 30, spark: sc.spark.relay }), { still: 3.2 });
+          } else {
+            run = () => play(5.4, (t) => {
+              neuronSequence(m, t, { dIn: 1.0, soma: 0.5, out: 3.4, axonWidth: 90, dendWidth: 150, spark: sc.spark.motor });
+              const c = smooth(seg(t, 4.6, 5.2));
+              sc.muscle.scale.set(1 - 0.12 * c, 1 + 0.14 * c, 1 + 0.14 * c);
+            }, { still: 4.75 });
+          }
+          addPlay(run); run();
+        } else if (plan.scene === 'reflex') {
+          const { sensory, relay, motor, muscle, hotMat } = sc;
+          [sensory, relay, motor].forEach((m) => { m.clearSignals(); m.highlight(null, { instant: true }); });
+          setLabels(sc, [...plan.labels, 'x_hot']);
+          const dmin = Math.min(...sensory.nodes.map((nd) => nd.d)), dmax = Math.max(...sensory.nodes.map((nd) => nd.d));
+          const run = () => play(10.5, (t) => {
+            const G = glowOn();
+            hotMat.emissiveIntensity = 0.5 + 0.6 * smooth(seg(t, 0, 0.6)) * (get('calm') === 'true' ? 0.3 : 1);
+            const u = seg(t, 0.4, 4.2);
+            const f = dmin + (dmax - dmin) * u;
+            sensory.setFront('dendrites', f, u > 0 && u < 1 ? G : 0, 450); sensory.setFront('axon', f, u > 0 && u < 1 ? G : 0, 450);
+            sensory.setFront('soma', 0, G * 0.8 * Math.sin(Math.PI * seg(u, 0.55, 0.8)));
+            const sp = sc.spark.sensory; sp.visible = f >= 0 && u > 0 && u < 1; if (sp.visible) sp.position.copy(sc.sPath.at(f));
+            neuronSequence(relay, t, { delay: 4.0, dIn: 0.8, soma: 0.4, out: 1.2, axonWidth: 60, dendWidth: 40, spark: sc.spark.relay });
+            neuronSequence(motor, t, { delay: 6.0, dIn: 0.7, soma: 0.4, out: 2.8, axonWidth: 420, dendWidth: 260, spark: sc.spark.motor });
+            const c = smooth(seg(t, 9.2, 9.9));
+            muscle.scale.set(1 - 0.14 * c, 1 + 0.16 * c, 1 + 0.16 * c);
+          }, { still: 10.5 });
+          addPlay(run); run();
         }
+        frame(plan, !prev || prev.scene !== plan.scene);
+        stage.requestRender();
+      }
+      function addPlay(run) {
+        if (reducedMotion()) return;
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'nrn3d-btn'; b.textContent = '↻ Play again';
+        b.addEventListener('click', run); controls.prepend(b);
       }
 
-      return { show, dispose() { tw.clear(); wrap.remove(); controls.remove(); cap.remove(); } };
+      return {
+        show,
+        dispose() {
+          anim = null; offInteract();
+          for (const m of models) m.dispose();
+          stage.dispose();
+          [style, controls, note, cap, loading].forEach((e) => e.remove());
+        },
+      };
     },
   },
 };

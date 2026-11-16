@@ -1,514 +1,160 @@
 // Synaptic transmission — AQA 7182 Biopsychology (AS + A-level):
 // "The process of synaptic transmission, including reference to neurotransmitters, excitation and inhibition."
-// Visual: a large hand-built SVG synapse cross-section on the dark stage. Each step plays only its own
-// part of one shared timeline (impulse arrives → vesicles fuse → neurotransmitter diffuses → binds →
-// effect), with "Play again". Step 5 lets the learner switch excitatory/inhibitory; step 6 is an
-// interactive, learner-paced summation demo with a threshold line. Reduced motion shows still end-states.
+// Visual: a 3D synapse, cut open so you can see inside: presynaptic terminal (bouton) with vesicles, the
+// synaptic cleft, and a dendritic spine of the next neuron. Membranes, vesicles (40 nm), the cleft (20 nm) and the
+// receptor proteins are roughly to scale with each other; the neurotransmitter molecules are drawn much bigger and
+// far fewer. Receptor, transporter and enzyme shapes are smoothed surfaces computed from real Protein Data Bank
+// structures (public/molecules, see public/neurons/credits.json). Step 6 (summation) uses a real human neuron
+// (NeuroMorpho.Org). Each step plays its own part once, with "Play again"; reduced motion shows still end-states;
+// calm mode removes the glow.
+import * as THREE from 'three';
 import { reducedMotion, get } from '../settings.js';
+import { createStage } from '../three/stage3d.js';
+import { tissueMaterial } from '../three/look.js';
+import { loadSWC, buildNeuron, updatePixelScale, createSpark } from '../three/neuron3d.js';
 
-/* ------------------------------------------------------------------ helpers */
-const NS = 'http://www.w3.org/2000/svg';
-function s(tag, attrs = {}, parent) {
-  const e = document.createElementNS(NS, tag);
-  for (const k in attrs) e.setAttribute(k, attrs[k]);
-  if (parent) parent.append(e);
-  return e;
-}
+const BASE = import.meta.env.BASE_URL;
+const MOL = {
+  ampa: `${BASE}molecules/ampa-receptor-3KG2.json`,
+  gaba: `${BASE}molecules/gabaa-receptor-6HUP.json`,
+  sert: `${BASE}molecules/serotonin-transporter-5I6X.json`,
+  ache: `${BASE}molecules/acetylcholinesterase-4EY4.json`,
+};
+const PYR = `${BASE}neurons/pyramidal-human-685815936.swc`;
+
+const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const seg = (t, a, b) => clamp((t - a) / (b - a));
-const ease = (u) => (u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2);
-const easeOut = (u) => 1 - Math.pow(1 - u, 2.2);
-const lerp = (a, b, u) => a + (b - a) * u;
-const f1 = (n) => n.toFixed(1);
-const place = (el, x, y, k = 1, rot = 0) => el.setAttribute('transform', `translate(${f1(x)} ${f1(y)})${rot ? ` rotate(${rot.toFixed(1)})` : ''}${k !== 1 ? ` scale(${k.toFixed(3)})` : ''}`);
+const smooth = (u) => u * u * (3 - 2 * u);
+const easeOut = (u) => 1 - Math.pow(1 - u, 2.4);
 function rng(seed) { return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }; }
 
-function makeTweens() {
-  let list = [], raf = 0;
-  const loop = (now) => {
-    const fin = [];
-    list = list.filter((tw) => {
-      const u = Math.min(1, (now - tw.t0) / tw.dur);
-      tw.fn(u);
-      if (u >= 1) { fin.push(tw); return false; }
-      return true;
-    });
-    fin.forEach((tw) => tw.done?.());
-    raf = list.length ? requestAnimationFrame(loop) : 0;
-  };
-  return {
-    add(dur, fn, done) {
-      if (reducedMotion() || dur <= 0) { fn(1); done?.(); return; }
-      list.push({ t0: performance.now(), dur, fn, done });
-      if (!raf) raf = requestAnimationFrame(loop);
-    },
-    clear() { list = []; cancelAnimationFrame(raf); raf = 0; },
-  };
-}
-
-function label(parent, { at, to, pos = 'right', anchor, text, sub }) {
-  const g = s('g', { class: 'lbl' }, parent);
-  if (at) {
-    s('line', { x1: at[0], y1: at[1], x2: to[0], y2: to[1], class: 'leader' }, g);
-    s('circle', { cx: at[0], cy: at[1], r: 4, class: 'leader-dot' }, g);
-  }
-  const pill = s('rect', { class: 'pill', rx: 10 }, g);
-  const [lx, ly] = to;
-  const extra = sub ? 22 : 0;
-  let x = lx, y = ly, a = 'middle';
-  if (pos === 'right') { x = lx + 12; y = ly + 7 - extra / 2; a = 'start'; }
-  if (pos === 'left') { x = lx - 12; y = ly + 7 - extra / 2; a = 'end'; }
-  if (pos === 'above') { y = ly - 12 - extra; }
-  if (pos === 'below') { y = ly + 26; }
-  if (pos === 'none') { y = ly + 7 - extra / 2; }
-  if (anchor) a = anchor;
-  const t = s('text', { x, y, 'text-anchor': a }, g);
-  t.append(document.createTextNode(text));
-  if (sub) { const ts = s('tspan', { x, dy: 22, class: 'sub' }, t); ts.textContent = sub; }
-  g.fit = () => {
-    try {
-      const b = t.getBBox();
-      if (!b.width) return;
-      pill.setAttribute('x', f1(b.x - 9)); pill.setAttribute('y', f1(b.y - 4));
-      pill.setAttribute('width', f1(b.width + 18)); pill.setAttribute('height', f1(b.height + 8));
-    } catch { /* not rendered yet */ }
-  };
-  return g;
-}
-
-/* ------------------------------------------------------------------ look */
-const COL = { e: '#FFC65C', i: '#7CC8FF', wrong: '#FF8FB1', pulse: '#9AF4FF', pre: '#9CC1FF', post: '#C8B2FF' };
-const SHAPE = {
-  e: 'M-6.5,0a6.5,6.5 0 1,0 13,0a6.5,6.5 0 1,0 -13,0',
-  i: 'M-7.5,-5 L7.5,-5 L0,7 Z',
-  wrong: 'M-6,-6 H6 V6 H-6 Z',
-};
-const HALF = {
-  e: ['M0,-6.5 A6.5,6.5 0 0,0 0,6.5 Z', 'M0,-6.5 A6.5,6.5 0 0,1 0,6.5 Z'],
-  i: ['M-7.5,-5 L0,-5 L0,7 Z', 'M0,-5 L7.5,-5 L0,7 Z'],
-};
-const BOUND_Y = { e: 334, i: 339 };
-function receptorD(rx, type) {
-  const pocket = type === 'e'
-    ? `L${rx - 7.5},334 A7.5,7.5 0 0 0 ${rx + 7.5},334`
-    : `L${rx - 8},334 L${rx},346 L${rx + 8},334`;
-  return `M${rx - 16},370 L${rx - 16},342 Q${rx - 16},334 ${rx - 9},334 ${pocket} L${rx + 9},334 Q${rx + 16},334 ${rx + 16},342 L${rx + 16},370 Z`;
-}
+const COL = { e: '#FFC65C', i: '#7CC8FF', wrong: '#FF8FB1', ca: '#9DF29B', na: '#FFB070', cl: '#86B8FF' };
 
 const CSS = `
-.syn-vis svg { width: 100%; height: 100%; }
-.syn-vis .part { transition: opacity .5s ease; }
-.syn-vis .part.dim { opacity: .2; }
-.syn-vis .gone { opacity: 0 !important; pointer-events: none; }
-.syn-vis .fade { transition: opacity .5s ease; }
-.syn-vis .lbl { opacity: 0; transition: opacity .45s ease; pointer-events: none; }
-.syn-vis .lbl.on { opacity: 1; }
-.syn-vis .leader { stroke: rgb(236 239 247 / 75%); stroke-width: 1.6; }
-.syn-vis .leader-dot { fill: #ECEFF7; }
-.syn-vis .pill { fill: rgb(8 13 27 / 82%); stroke: rgb(236 239 247 / 18%); stroke-width: 1; }
-.syn-vis .diagram text { font-size: 20px; font-weight: 700; letter-spacing: 0; word-spacing: 0; }
-.syn-vis .diagram text .sub, .syn-vis .diagram text.sub { font-size: 18px; font-weight: 400; fill: #C3CCE4; }
-.syn-vis .diagram text.note { font-size: 18px; font-weight: 400; fill: #C3CCE4; }
-.syn-vis .diagram text.big { font-size: 26px; }
-.syn-vis .diagram text.glyph { font-size: 26px; }
-.syn-vis .diagram text.on-bulb { font-size: 22px; fill: #10131C; }
-.syn-vis.calm [filter] { filter: none; }
+.syn3d-cap { background: rgb(8 12 24 / 82%); padding: 8px 14px; border-radius: 12px; width: fit-content; max-width: calc(100% - 32px); line-height: 1.35; }
+.syn3d-note { position: absolute; right: 14px; top: 14px; z-index: 2; background: rgb(8 12 24 / 82%); color: #F4F6FB; border: 1px solid rgb(255 255 255 / 20%);
+  border-radius: 10px; padding: 6px 10px; font-size: 15px; font-weight: 700; max-width: 42%; pointer-events: none; line-height: 1.3; }
+.syn3d-note[hidden] { display: none; }
+.syn3d-loading { position: absolute; inset: 0; display: grid; place-items: center; color: #ECEFF7; font-weight: 700; font-size: 1.05rem; }
+.syn3d-meter { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); z-index: 2; width: 92px; padding: 10px 8px 12px; border-radius: 14px;
+  background: rgb(8 12 24 / 86%); border: 1px solid rgb(255 255 255 / 20%); color: #F4F6FB; text-align: center; pointer-events: none; }
+.syn3d-meter[hidden] { display: none; }
+.syn3d-meter h4 { margin: 0 0 6px; font-size: 15px; line-height: 1.2; }
+.syn3d-meter .track { position: relative; height: 180px; width: 22px; margin: 4px auto; border-radius: 11px; background: rgb(255 255 255 / 12%); }
+.syn3d-meter .zero { position: absolute; left: -10px; right: -10px; top: 50%; height: 2px; background: rgb(255 255 255 / 55%); }
+.syn3d-meter .th { position: absolute; left: -14px; right: -14px; height: 0; border-top: 3px dashed #FFE7A6; }
+.syn3d-meter .fill { position: absolute; left: 3px; right: 3px; border-radius: 8px; transition: none; }
+.syn3d-meter .dot { position: absolute; left: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: #ECEFF7; box-shadow: 0 0 0 3px #0A0F1E; }
+.syn3d-meter .end { font-size: 18px; font-weight: 800; line-height: 1; }
+.syn3d-meter .thl { font-size: 15px; color: #FFE7A6; font-weight: 700; }
+.lesson-visual .vis-controls button.syn3d-btn { min-height: 44px; min-width: 44px; }
+@media (max-width: 700px) { .syn3d-meter { width: 78px; } .syn3d-meter .track { height: 130px; } .syn3d-note { max-width: 55%; } }
 `;
 
-function defs(svg) {
-  const d = s('defs', {}, svg);
-  d.innerHTML = `
-    <filter id="syn-glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="syn-soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <linearGradient id="syn-pre" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22355F"/><stop offset="1" stop-color="#2F4C86"/></linearGradient>
-    <linearGradient id="syn-post" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3C2F6B"/><stop offset=".7" stop-color="#271E49"/><stop offset="1" stop-color="#1D1738"/></linearGradient>
-    <linearGradient id="syn-rec" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E2D4FF"/><stop offset="1" stop-color="#8F6FE3"/></linearGradient>
-    <radialGradient id="syn-ves" cx="40%" cy="35%" r="65%"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".22"/><stop offset="1" stop-color="#9CC1FF" stop-opacity=".06"/></radialGradient>
-    <radialGradient id="syn-halo" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#9AF4FF" stop-opacity=".8"/><stop offset=".45" stop-color="#3FD8FF" stop-opacity=".28"/><stop offset="1" stop-color="#3FD8FF" stop-opacity="0"/></radialGradient>
-    <radialGradient id="syn-soma" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#CBB8FF"/><stop offset=".6" stop-color="#7E62D6"/><stop offset="1" stop-color="#4A3596"/></radialGradient>
-    <radialGradient id="syn-bulbE" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#FFF0C9"/><stop offset="1" stop-color="#F0A93A"/></radialGradient>
-    <radialGradient id="syn-bulbI" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#E3F4FF"/><stop offset="1" stop-color="#4FA6E8"/></radialGradient>
-    <marker id="syn-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ECEFF7"/></marker>`;
+/* ------------------------------------------------------------------ data loading */
+function b64(s, Type) {
+  const bin = atob(s); const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return new Type(u8.buffer);
 }
-function spark(parent, r = 9) {
-  const g = s('g', { opacity: 0 }, parent);
-  s('circle', { r: r * 2.6, fill: 'url(#syn-halo)' }, g);
-  s('circle', { r, fill: COL.pulse, filter: 'url(#syn-glow)' }, g);
-  return g;
-}
-
-/* ------------------------------------------------------------------ main synapse scene */
-const PRE_FILL = 'M372,-20 L372,60 C372,112 218,118 216,196 L216,262 Q216,292 246,292 L554,292 Q584,292 584,262 L584,196 C582,118 428,112 428,60 L428,-20 Z';
-const PRE_OUT = 'M246,292 Q216,292 216,262 L216,196 C218,118 372,112 372,60 L372,-20 M428,-20 L428,60 C428,112 582,118 584,196 L584,262 Q584,292 554,292';
-const RX = [245, 322, 400, 478, 555];
-const REL = [{ x: 325, y: 236, fx: 330 }, { x: 400, y: 246, fx: 405 }, { x: 475, y: 236, fx: 480 }];
-const STATIC_VES = [[282, 180], [358, 160], [440, 162], [516, 186]];
-const OFF = [[-6, -6], [7, -5], [-6, 7], [6, 6]];
-// Where each released molecule ends up: r = receptor index (binds), or a free spot in the cleft.
-const DEST = [
-  [{ r: 1 }, { x: 262, y: 312 }, { x: 296, y: 326 }, { x: 352, y: 306 }],
-  [{ r: 2 }, { r: 3 }, { x: 375, y: 322 }, { x: 434, y: 310 }],
-  [{ r: 4 }, { x: 452, y: 326 }, { x: 515, y: 308 }, { x: 540, y: 325 }],
-];
-const TX = [262, 538];
-const EZ = [[284, 319], [512, 319]];
-const GLYPHS = [[175, 400], [255, 412], [335, 398], [465, 398], [545, 412], [625, 400]];
-const T_END = 6800;
-
-function buildMain(svg) {
-  const g = s('g', {}, svg);
-  const P = {}, Lb = {};
-  const st = { type: 'e', wrong: false, meter: false, removal: false };
-
-  // postsynaptic neuron
-  P.post = s('g', { class: 'part' }, g);
-  s('path', { d: 'M150,348 L650,348 Q680,348 680,378 L680,640 L120,640 L120,378 Q120,348 150,348 Z', fill: 'url(#syn-post)' }, P.post);
-  s('path', { d: 'M120,640 L120,378 Q120,348 150,348 L650,348 Q680,348 680,378 L680,640', fill: 'none', stroke: COL.post, 'stroke-width': 3 }, P.post);
-  s('path', { d: 'M150,354 L650,354', fill: 'none', stroke: COL.post, 'stroke-width': 1, opacity: 0.35 }, P.post);
-
-  // charge glyphs + meter (excitation / inhibition)
-  P.meter = s('g', { class: 'part fade' }, g);
-  const glyphs = GLYPHS.map(([x, y]) => { const t = s('text', { x, y, 'text-anchor': 'middle', class: 'glyph', opacity: 0 }, P.meter); return t; });
-  const mt = s('text', { x: 400, y: 448, 'text-anchor': 'middle', class: 'note' }, P.meter); mt.textContent = 'Charge inside the postsynaptic neuron';
-  s('rect', { x: 240, y: 462, width: 320, height: 16, rx: 8, fill: '#fff', opacity: 0.12 }, P.meter);
-  const mfill = s('rect', { x: 400, y: 462, width: 0, height: 16, rx: 8, fill: COL.e }, P.meter);
-  s('line', { x1: 400, y1: 454, x2: 400, y2: 486, stroke: '#ECEFF7', 'stroke-width': 2, opacity: 0.7 }, P.meter);
-  const mm = s('text', { x: 222, y: 479, 'text-anchor': 'middle', class: 'big' }, P.meter); mm.textContent = '−';
-  const mp = s('text', { x: 578, y: 479, 'text-anchor': 'middle', class: 'big' }, P.meter); mp.textContent = '+';
-  const mres = s('text', { x: 400, y: 514, 'text-anchor': 'middle', opacity: 0 }, P.meter);
-
-  // receptors
-  P.receptors = s('g', { class: 'part' }, g);
-  const rec = RX.map((rx) => {
-    const body = s('path', { d: receptorD(rx, 'e'), fill: 'url(#syn-rec)' }, P.receptors);
-    const glow = s('path', { d: receptorD(rx, 'e'), fill: 'none', stroke: COL.e, 'stroke-width': 2.5, filter: 'url(#syn-soft)', opacity: 0 }, P.receptors);
-    return { rx, body, glow };
-  });
-
-  // presynaptic terminal
-  P.pre = s('g', { class: 'part' }, g);
-  s('path', { d: PRE_FILL, fill: 'url(#syn-pre)' }, P.pre);
-  s('path', { d: PRE_OUT, fill: 'none', stroke: COL.pre, 'stroke-width': 3 }, P.pre);
-  const membrane = s('path', { d: 'M246,292 L554,292', fill: 'none', stroke: COL.pre, 'stroke-width': 3 }, P.pre);
-  const glowOut = s('path', { d: PRE_OUT + ' M246,292 L554,292', fill: 'none', stroke: COL.pulse, 'stroke-width': 3, filter: 'url(#syn-glow)', opacity: 0 }, P.pre);
-  const omegas = REL.map(() => s('path', { fill: 'none', stroke: COL.pre, 'stroke-width': 2.5, opacity: 0 }, P.pre));
-
-  // reuptake transporters (step 7)
-  P.clear = s('g', { class: 'part fade' }, g);
-  TX.forEach((x) => {
-    s('rect', { x: x - 13, y: 279, width: 9, height: 28, rx: 4.5, fill: '#8FE3FF' }, P.clear);
-    s('rect', { x: x + 4, y: 279, width: 9, height: 28, rx: 4.5, fill: '#8FE3FF' }, P.clear);
-  });
-
-  // vesicles
-  P.vesicles = s('g', { class: 'part' }, g);
-  const ves = REL.map((v) => {
-    const vg = s('g', {}, P.vesicles);
-    const ring = s('circle', { r: 19, fill: 'url(#syn-ves)', stroke: '#CFE0FF', 'stroke-width': 2 }, vg);
-    return { ...v, g: vg, ring, cx: v.x, cy: v.y, u2: 0 };
-  });
-  const statics = [];
-  STATIC_VES.forEach(([x, y]) => {
-    const vg = s('g', { transform: `translate(${x} ${y})` }, P.vesicles);
-    s('circle', { r: 19, fill: 'url(#syn-ves)', stroke: '#CFE0FF', 'stroke-width': 2 }, vg);
-    OFF.forEach(([ox, oy]) => statics.push(s('path', { d: SHAPE.e, fill: COL.e, transform: `translate(${ox} ${oy}) scale(.72)` }, vg)));
-  });
-
-  // enzymes (step 7) — drawn in the cleft
-  EZ.forEach(([x, y]) => s('path', { d: `M${x},${y} L${x + 13},${y - 7} A15,15 0 1,0 ${x + 13},${y + 7} Z`, fill: '#7FE3B5', opacity: 0.95 }, P.clear));
-
-  // neurotransmitter molecules
-  P.nt = s('g', { class: 'part' }, g);
-  const parts = [];
-  DEST.forEach((list, vi) => list.forEach((dst, k) => {
-    const el = s('path', { d: SHAPE.e, fill: COL.e, filter: 'url(#syn-soft)' }, P.nt);
-    const h1 = s('path', { d: HALF.e[0], fill: COL.e, opacity: 0 }, P.nt);
-    const h2 = s('path', { d: HALF.e[1], fill: COL.e, opacity: 0 }, P.nt);
-    parts.push({ vi, k, el, h1, h2, ox: OFF[k][0], oy: OFF[k][1], delay: k * 95 + vi * 40, ph: (vi * 4 + k) * 1.7, r: dst.r, tx: dst.r != null ? RX[dst.r] : dst.x, ty: dst.r != null ? 316 : dst.y });
-  }));
-  parts.forEach((p, i) => {
-    p.mode = i % 2 === 0 ? 'reuptake' : 'enzyme';
-    if (p.mode === 'reuptake') p.dest = [TX[p.tx < 400 ? 0 : 1], 300];
-    else { const e = EZ[p.tx < 400 ? 0 : 1]; p.dest = [e[0] - 2, e[1]]; }
-  });
-  // a wrong-shaped molecule (lock-and-key step)
-  const wrong = s('path', { d: SHAPE.wrong, fill: COL.wrong, filter: 'url(#syn-soft)', opacity: 0 }, g);
-
-  // impulse arriving
-  const ap = spark(g, 10);
-
-  // one-way arrow (step 8)
-  Lb.oneway = s('g', { class: 'lbl' }, g);
-  s('line', { x1: 74, y1: 110, x2: 74, y2: 420, stroke: '#ECEFF7', 'stroke-width': 3, 'marker-end': 'url(#syn-arrow)', opacity: 0.85 }, Lb.oneway);
-  const ow1 = s('text', { x: 74, y: 456, 'text-anchor': 'middle' }, Lb.oneway); ow1.textContent = 'One way';
-  const ow2 = s('text', { x: 74, y: 478, 'text-anchor': 'middle', class: 'sub' }, Lb.oneway); ow2.textContent = 'only';
-
-  // labels
-  Lb.pre = label(g, { at: [540, 150], to: [650, 150], pos: 'above', text: 'Presynaptic neuron', sub: '(terminal button)' });
-  Lb.cleft = label(g, { at: [560, 320], to: [600, 252], pos: 'right', text: 'Synaptic cleft', sub: '(the gap)' });
-  Lb.post = label(g, { to: [400, 410], pos: 'none', text: 'Postsynaptic neuron' });
-  Lb.ap = label(g, { at: [428, 30], to: [520, 40], pos: 'right', text: 'Action potential', sub: '(electrical)' });
-  Lb.vesicle = label(g, { at: [535, 186], to: [600, 186], pos: 'right', text: 'Synaptic vesicle' });
-  Lb.nt = label(g, { at: [276, 174], to: [150, 122], pos: 'above', text: 'Neurotransmitter' });
-  Lb.exo = label(g, { at: [480, 292], to: [610, 296], pos: 'right', text: 'Exocytosis', sub: '(release)' });
-  Lb.diff = label(g, { at: [548, 318], to: [610, 296], pos: 'right', text: 'Diffusion', sub: 'across the gap' });
-  Lb.receptor = label(g, { at: [571, 356], to: [660, 392], pos: 'right', text: 'Receptor', sub: '(protein)' });
-  Lb.wrong = label(g, { at: [200, 305], to: [120, 252], pos: 'above', text: 'Wrong shape', sub: 'cannot bind' });
-  Lb.reuptake = label(g, { at: [262, 284], to: [150, 236], pos: 'above', text: 'Reuptake', sub: 'taken back in' });
-  Lb.enzyme = label(g, { at: [526, 319], to: [640, 300], pos: 'right', text: 'Enzyme', sub: 'breaks it down' });
-  Lb.elec = label(g, { at: [428, 30], to: [520, 40], pos: 'right', text: 'Electrical', sub: 'inside the neuron' });
-  Lb.chem = label(g, { at: [560, 320], to: [600, 252], pos: 'right', text: 'Chemical', sub: 'across the gap' });
-  Lb.clearMsg = label(g, { to: [400, 320], pos: 'none', text: 'The gap is clear' });
-
-  function setType(type) {
-    st.type = type;
-    const c = COL[type];
-    parts.forEach((p) => { p.el.setAttribute('d', SHAPE[type]); p.el.setAttribute('fill', c); p.h1.setAttribute('d', HALF[type][0]); p.h2.setAttribute('d', HALF[type][1]); p.h1.setAttribute('fill', c); p.h2.setAttribute('fill', c); });
-    statics.forEach((el) => { el.setAttribute('d', SHAPE[type]); el.setAttribute('fill', c); });
-    rec.forEach((r) => { const d = receptorD(r.rx, type); r.body.setAttribute('d', d); r.glow.setAttribute('d', d); r.glow.setAttribute('stroke', c); });
-    glyphs.forEach((t) => { t.textContent = type === 'e' ? '+' : '−'; t.setAttribute('style', `fill:${c}`); });
-    mfill.setAttribute('fill', c);
-    mres.textContent = type === 'e' ? 'More likely to fire (excitation)' : 'Less likely to fire (inhibition)';
+const molCache = new Map();
+/** A smoothed protein surface (nm, +Y = outside the cell, membrane centre at y = 0). */
+function loadMol(url) {
+  if (!molCache.has(url)) {
+    molCache.set(url, fetch(url).then((r) => { if (!r.ok) throw new Error(url); return r.json(); }).then((j) => {
+      const q = b64(j.positions, Int16Array); const idx = b64(j.indices, Uint16Array);
+      const pos = new Float32Array(q.length); for (let i = 0; i < q.length; i++) pos[i] = q[i] / 100;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      g.setIndex(new THREE.BufferAttribute(idx, 1));
+      g.computeVertexNormals();
+      g.computeBoundingBox();
+      return { geo: g, meta: j };
+    }));
   }
-
-  // where a molecule sits at time t of the main timeline
-  function ntPos(p, t) {
-    const v = ves[p.vi];
-    if (t < 2950 + p.delay) {
-      const sq = 1 - 0.55 * v.u2;
-      return { x: v.cx + p.ox * sq, y: v.cy + p.oy * sq, k: 0.72, op: 1 };
-    }
-    const u = seg(t, 2950 + p.delay, 4750 + p.delay * 0.5);
-    const e = easeOut(u);
-    const sx = v.fx + p.ox * 0.4, sy = 297;
-    let x = lerp(sx, p.tx, e) + Math.sin(u * Math.PI * 2.6 + p.ph) * 10 * Math.sin(Math.PI * u);
-    let y = lerp(sy, p.ty, e) + Math.sin(u * Math.PI * 3.3 + p.ph * 0.7) * 3 * Math.sin(Math.PI * u);
-    if (p.r != null) {
-      const b = ease(seg(t, 5000, 5450));
-      x = lerp(x, p.tx, b); y = lerp(y, BOUND_Y[st.type], b);
-    }
-    return { x, y, k: lerp(0.72, 1, seg(t, 2950 + p.delay, 3250 + p.delay)), op: 1 };
-  }
-
-  function render(t) {
-    // 1. action potential arrives
-    const a = seg(t, 0, 1200);
-    place(ap, 400, lerp(-30, 180, ease(a)));
-    ap.setAttribute('opacity', t <= 0 ? 0 : (1 - seg(t, 1150, 1500)).toFixed(2));
-    glowOut.setAttribute('opacity', (seg(t, 950, 1300) * (1 - 0.85 * seg(t, 3200, 4400))).toFixed(2));
-    // 2. vesicles move to the membrane and fuse
-    ves.forEach((v, k) => {
-      const u1 = ease(seg(t, 1500 + k * 120, 2600 + k * 120));
-      const u2 = ease(seg(t, 2650 + k * 60, 2950 + k * 60));
-      v.cx = lerp(v.x, v.fx, u1); v.cy = lerp(lerp(v.y, 271, u1), 290, u2); v.u2 = u2;
-      place(v.g, v.cx, v.cy);
-      v.ring.setAttribute('opacity', (1 - u2).toFixed(2));
-      const r = 19 * (1 - seg(t, 2950, 3800));
-      const om = omegas[k];
-      if (u2 > 0.6 && r > 0.5) { om.setAttribute('d', `M${f1(v.fx - r)},292 A${f1(r)},${f1(r)} 0 0 1 ${f1(v.fx + r)},292`); om.setAttribute('opacity', 0.9); } else om.setAttribute('opacity', 0);
-    });
-    const w = 20 * seg(t, 2750, 2950) * (1 - seg(t, 3800, 4300));
-    let dash = [], prev = 246;
-    REL.forEach((v) => { dash.push(Math.max(0, v.fx - w / 2 - prev), w); prev = v.fx + w / 2; });
-    dash.push(554 - prev + 10, 0.01);
-    membrane.setAttribute('stroke-dasharray', dash.map(f1).join(' '));
-    // 3–4. diffusion and binding
-    parts.forEach((p) => {
-      const q = ntPos(p, t);
-      place(p.el, q.x, q.y, q.k); p.el.setAttribute('opacity', q.op); p.x = q.x; p.y = q.y;
-      p.h1.setAttribute('opacity', 0); p.h2.setAttribute('opacity', 0);
-    });
-    rec.forEach((r, k) => r.glow.setAttribute('opacity', k > 0 ? seg(t, 5300, 5650).toFixed(2) : 0));
-    // wrong-shaped molecule bounces off the empty receptor
-    if (st.wrong) {
-      const u1 = ease(seg(t, 4700, 5250)), u2 = easeOut(seg(t, 5250, 5950));
-      const x = u2 > 0 ? lerp(245, 200, u2) : lerp(214, 245, u1);
-      const y = u2 > 0 ? lerp(322, 305, u2) - Math.sin(Math.PI * u2) * 16 : lerp(296, 322, u1);
-      place(wrong, x, y, 1, 25 * u2);
-      wrong.setAttribute('opacity', seg(t, 4600, 4800).toFixed(2));
-    } else wrong.setAttribute('opacity', 0);
-    // 5. effect on the postsynaptic neuron
-    effect(seg(t, 5600, 6600), t);
-  }
-  function effect(u, t) {
-    const val = (st.type === 'e' ? 1 : -1) * ease(u) * 2;
-    mfill.setAttribute('x', f1(val >= 0 ? 400 : 400 + val * 80));
-    mfill.setAttribute('width', f1(Math.abs(val) * 80));
-    glyphs.forEach((gl, i) => gl.setAttribute('opacity', seg(u, 0.1 + i * 0.1, 0.5 + i * 0.1).toFixed(2)));
-    mres.setAttribute('opacity', seg(u, 0.6, 1).toFixed(2));
-  }
-
-  // step 7: removal, starting from the end of the main timeline
-  function renderRemoval(r) {
-    render(T_END);
-    rec.forEach((rc, k) => rc.glow.setAttribute('opacity', k > 0 ? (1 - seg(r, 0, 400)).toFixed(2) : 0));
-    effect(1 - seg(r, 300, 2300), 0);
-    parts.forEach((p, i) => {
-      let x = p.tx, y = p.r != null ? BOUND_Y[st.type] : p.ty;
-      const ub = ease(seg(r, 0, 500));
-      if (p.r != null) y = lerp(y, 314, ub);
-      const d = 350 + i * 105;
-      const u = ease(seg(r, d, d + 1250));
-      x = lerp(x, p.dest[0], u); y = lerp(y, p.dest[1], u);
-      let op = 1;
-      p.h1.setAttribute('opacity', 0); p.h2.setAttribute('opacity', 0);
-      if (p.mode === 'reuptake') {
-        const u2 = ease(seg(r, d + 1250, d + 1750));
-        y = lerp(y, 262, u2);
-        op = 1 - seg(r, d + 1550, d + 1900);
-      } else {
-        const u2 = seg(r, d + 1250, d + 1900);
-        if (u2 > 0) {
-          op = 0;
-          const hop = (1 - seg(u2, 0.5, 1)).toFixed(2);
-          place(p.h1, x - 2 - 12 * u2, y + 5 * u2); place(p.h2, x + 2 + 12 * u2, y - 5 * u2);
-          p.h1.setAttribute('opacity', hop); p.h2.setAttribute('opacity', hop);
-        }
-      }
-      place(p.el, x, y); p.el.setAttribute('opacity', op.toFixed(2));
-    });
-    Lb.clearMsg.classList.toggle('on', r >= 3500);
-  }
-
-  function configure(plan) {
-    st.wrong = !!plan.wrong;
-    setType(plan.type || 'e');
-    P.meter.classList.toggle('gone', !plan.meter);
-    P.clear.classList.toggle('gone', !plan.removal);
-  }
-  return { g, P, Lb, render, renderRemoval, configure, setType, st };
+  return molCache.get(url);
 }
 
-/* ------------------------------------------------------------------ summation scene */
-function buildSum(svg) {
-  const g = s('g', {}, svg);
-  const Lb = {};
-  const SX = 330, SY = 330, R = 64;
-  const rand = rng(3);
-  const col = '#A891F0';
-  // dendrites of the postsynaptic neuron
-  const dg = s('g', { fill: 'none', stroke: col, 'stroke-linecap': 'round' }, g);
-  const tree = (x, y, ang, gen, W, L) => {
-    const len = L[gen] * (0.85 + rand() * 0.3), bend = (rand() - 0.5) * 0.5;
-    const x2 = x + Math.cos(ang) * len, y2 = y + Math.sin(ang) * len;
-    s('path', { d: `M${f1(x)},${f1(y)} Q${f1(x + Math.cos(ang + bend) * len * 0.55)},${f1(y + Math.sin(ang + bend) * len * 0.55)} ${f1(x2)},${f1(y2)}`, 'stroke-width': W[gen] }, dg);
-    if (gen < L.length - 1) { const sp = 0.4 + rand() * 0.2; tree(x2, y2, ang - sp, gen + 1, W, L); tree(x2, y2, ang + sp, gen + 1, W, L); }
+/* ------------------------------------------------------------------ shapes */
+/** Smooth lathe from (r, y) control points. */
+function lathe(points, segs = 96, steps = 90) {
+  const c = new THREE.SplineCurve(points.map(([r, y]) => new THREE.Vector2(r, y)));
+  const pts = c.getPoints(steps).map((p) => new THREE.Vector2(Math.max(0, p.x), p.y));
+  return { geo: new THREE.LatheGeometry(pts, segs), profile: pts };
+}
+/** The outline where the cut plane (z = 0) slices a lathe: drawn as a thin bright tube (the membrane edge). */
+function cutOutline(profile, radius, mat) {
+  const left = profile.slice().reverse().map((p) => V(-p.x, p.y, 0.5));
+  const right = profile.map((p) => V(p.x, p.y, 0.5));
+  const pts = [...left, ...right.slice(1)];
+  return new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 400, radius, 6, false), mat);
+}
+/** Membrane material: cut open by the clipping plane; the inside surface is shaded as cytoplasm. */
+function membraneMaterial(color, inner, clip, U = {}) {
+  const m = tissueMaterial(color, { side: THREE.DoubleSide, clippingPlanes: [clip], roughness: 0.48, clearcoat: 0.35 });
+  const uniforms = { uInner: { value: new THREE.Color(inner) }, uInnerGlow: U.uInnerGlow || { value: new THREE.Color(0, 0, 0) },
+    uAPy: U.uAPy || { value: -1e6 }, uAPGlow: U.uAPGlow || { value: 0 }, uAPCol: { value: new THREE.Color('#FFE9A8') } };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, uniforms);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vY;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvY = position.y;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uInner, uInnerGlow, uAPCol; uniform float uAPy, uAPGlow; varying float vY;')
+      .replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'vec4 diffuseColor = vec4( gl_FrontFacing ? diffuse : uInner, opacity );')
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        float ap = exp(-pow((vY - uAPy) / 70.0, 2.0)) * uAPGlow;
+        totalEmissiveRadiance += uAPCol * ap * 1.4;
+        if (!gl_FrontFacing) totalEmissiveRadiance += uInnerGlow;`);
   };
-  [296, 64].forEach((deg) => { const a = (deg * Math.PI) / 180; tree(SX + Math.cos(a) * (R - 6), SY + Math.sin(a) * (R - 6), a, 0, [8, 4.5, 2.5], [40, 28, 18]); });
-  // axon
-  s('path', { d: `M${SX + R - 10},${SY - 14} Q${SX + R + 12},${SY - 5} ${SX + R + 26},${SY - 4} L${SX + R + 26},${SY + 4} Q${SX + R + 12},${SY + 5} ${SX + R - 10},${SY + 14}Z`, fill: col }, g);
-  s('line', { x1: SX + R + 20, y1: SY, x2: 590, y2: SY, stroke: col, 'stroke-width': 8, 'stroke-linecap': 'round' }, g);
-  // soma
-  const somaGlow = s('circle', { cx: SX, cy: SY, r: R + 8, fill: 'none', stroke: COL.e, 'stroke-width': 8, filter: 'url(#syn-glow)', opacity: 0 }, g);
-  s('circle', { cx: SX, cy: SY, r: R, fill: 'url(#syn-soma)' }, g);
-  s('circle', { cx: SX - 4, cy: SY - 4, r: 18, fill: '#E4DCFF', opacity: 0.55 }, g);
-
-  // inputs: two excitatory synapses, one inhibitory synapse
-  const inputs = [
-    { kind: 'e', deg: 235, from: [150, 92], ctrl: [215, 150] },
-    { kind: 'e', deg: 180, from: [30, 300], ctrl: [140, 318] },
-    { kind: 'i', deg: 125, from: [130, 548], ctrl: [215, 470] },
-  ].map((inp) => {
-    const a = (inp.deg * Math.PI) / 180;
-    const bx = SX + Math.cos(a) * (R + 22), by = SY + Math.sin(a) * (R + 22);
-    const cx = SX + Math.cos(a) * (R + 2), cy = SY + Math.sin(a) * (R + 2);
-    const c = COL[inp.kind];
-    s('path', { d: `M${inp.from[0]},${inp.from[1]} Q${inp.ctrl[0]},${inp.ctrl[1]} ${f1(bx - Math.cos(a) * 10)},${f1(by - Math.sin(a) * 10)}`, fill: 'none', stroke: c, 'stroke-width': 5, 'stroke-linecap': 'round', opacity: 0.85 }, g);
-    s('circle', { cx: f1(bx), cy: f1(by), r: 17, fill: inp.kind === 'e' ? 'url(#syn-bulbE)' : 'url(#syn-bulbI)' }, g);
-    const t = s('text', { x: f1(bx), y: f1(by + 7.5), 'text-anchor': 'middle', class: 'on-bulb' }, g); t.textContent = inp.kind === 'e' ? '+' : '−';
-    return { ...inp, bx, by, cx, cy, dots: [0, 1, 2, 3].map(() => s('path', { d: SHAPE[inp.kind], fill: c, opacity: 0, filter: 'url(#syn-soft)' }, g)) };
-  });
-  Lb.e = label(g, { at: [inputs[0].bx + 6, inputs[0].by - 12], to: [330, 166], pos: 'right', text: 'Excitatory synapses (+)' });
-  Lb.i = label(g, { at: [inputs[2].bx + 8, inputs[2].by + 12], to: [318, 478], pos: 'right', text: 'Inhibitory synapse (−)' });
-
-  // meter with threshold
-  const MX = 701, Y0 = 320, U = 40, TH = 3;
-  const yOf = (v) => Y0 - v * U;
-  s('rect', { x: MX - 13, y: 150, width: 26, height: 340, rx: 13, fill: '#fff', opacity: 0.1 }, g);
-  const fill = s('rect', { x: MX - 11, y: Y0, width: 22, height: 0, rx: 9, fill: COL.e }, g);
-  s('line', { x1: MX - 22, y1: Y0, x2: MX + 22, y2: Y0, stroke: '#ECEFF7', 'stroke-width': 2, opacity: 0.7 }, g);
-  s('line', { x1: 620, y1: yOf(TH), x2: MX + 26, y2: yOf(TH), stroke: '#FFE7A6', 'stroke-width': 2.5, 'stroke-dasharray': '7 6' }, g);
-  const tl = s('text', { x: 676, y: yOf(TH) - 10, 'text-anchor': 'end' }, g); tl.textContent = 'Threshold';
-  const rl = s('text', { x: 676, y: Y0 + 26, 'text-anchor': 'end', class: 'note' }, g); rl.textContent = 'Resting';
-  const pl = s('text', { x: MX + 22, y: 172, class: 'big' }, g); pl.textContent = '+';
-  const ml = s('text', { x: MX + 22, y: 490, class: 'big' }, g); ml.textContent = '−';
-  const net = s('text', { x: MX, y: 132, 'text-anchor': 'middle', class: 'big' }, g);
-  const marker = s('circle', { cx: MX, cy: Y0, r: 9, fill: '#ECEFF7' }, g);
-
-  // firing
-  const sp = spark(g, 9);
-  Lb.fire = label(g, { to: [500, 276], pos: 'none', text: 'It fires!', sub: 'action potential' });
-
-  const tw = makeTweens();
-  const state = { v: 0, shown: 0, n: 0 };
-  let onChange = () => {};
-  function drawMeter(v) {
-    const y = yOf(v);
-    fill.setAttribute('y', f1(Math.min(y, Y0))); fill.setAttribute('height', f1(Math.abs(Y0 - y)));
-    fill.setAttribute('fill', v >= 0 ? COL.e : COL.i);
-    marker.setAttribute('cy', f1(y));
+  m.customProgramCacheKey = () => 'syn-membrane-v1';
+  return m;
+}
+/** A small "key-shaped" molecule made of fused balls (drawn ~10× bigger than a real neurotransmitter). */
+function moleculeGeo(kind) {
+  const parts = [];
+  const add = (r, x, y, z) => { const k = 1.25; const g = new THREE.SphereGeometry(r * k, 14, 10); g.translate(x * k, y * k, z * k); parts.push(g); };
+  if (kind === 'e') { add(2.4, 0, 0, 0); add(1.9, 2.9, 1.0, 0); add(1.6, -2.6, 1.3, 0.4); add(1.3, 4.8, 2.4, 0); }
+  else if (kind === 'i') { add(2.3, 0, 0, 0); add(2.1, 3.2, 0, 0); add(1.5, 5.6, 0.8, 0); add(1.5, -2.6, -1.0, 0); }
+  else { add(2.0, 0, 0, 0); add(2.0, 2.6, 2.6, 0); add(2.0, -2.6, 2.6, 0); add(2.0, 0, 1.7, 2.8); }  // wrong shape
+  const merged = mergeGeos(parts); parts.forEach((p) => p.dispose());
+  return merged;
+}
+function mergeGeos(list) {
+  let nv = 0, ni = 0; list.forEach((g) => { nv += g.attributes.position.count; ni += g.index.count; });
+  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), idx = new Uint32Array(ni);
+  let ov = 0, oi = 0;
+  for (const g of list) {
+    pos.set(g.attributes.position.array, ov * 3); nor.set(g.attributes.normal.array, ov * 3);
+    const gi = g.index.array; for (let i = 0; i < gi.length; i++) idx[oi + i] = gi[i] + ov;
+    ov += g.attributes.position.count; oi += gi.length;
   }
-  function setNet(v) { net.textContent = `Net ${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)}`; }
-  function fire() {
-    Lb.fire.fit(); Lb.fire.classList.add('on');
-    tw.add(1100, (u) => {
-      place(sp, lerp(SX + R + 24, 590, ease(u)), SY); sp.setAttribute('opacity', u < 1 ? 1 : 0);
-      somaGlow.setAttribute('opacity', (Math.sin(Math.PI * Math.min(1, u * 1.6)) * 0.9).toFixed(2));
-      somaGlow.setAttribute('stroke', COL.e);
-    }, () => { sp.setAttribute('opacity', 0); somaGlow.setAttribute('opacity', 0); });
-  }
-  function send(kind) {
-    const before = state.v;
-    state.v = Math.max(-4, Math.min(4, state.v + (kind === 'e' ? 1 : -1)));
-    const src = kind === 'e' ? inputs[state.n++ % 2] : inputs[2];
-    const from = state.shown, to = state.v;
-    setNet(to);
-    tw.add(520, (u) => {
-      src.dots.forEach((d, k) => {
-        const uu = seg(u, k * 0.08, 0.7 + k * 0.08);
-        place(d, lerp(src.bx, src.cx, uu) + (k - 1.5) * 4 * Math.sin(Math.PI * uu), lerp(src.by, src.cy, uu) + (k - 1.5) * 3, 0.8);
-        d.setAttribute('opacity', uu > 0 && uu < 1 ? 1 : 0);
-      });
-    }, () => {
-      somaGlow.setAttribute('stroke', COL[kind]);
-      tw.add(500, (u) => {
-        state.shown = lerp(from, to, ease(u)); drawMeter(state.shown);
-        somaGlow.setAttribute('opacity', (Math.sin(Math.PI * u) * 0.6).toFixed(2));
-      }, () => {
-        state.shown = to; drawMeter(to);
-        if (before < TH && to >= TH) fire();
-        if (to < TH) Lb.fire.classList.remove('on');
-      });
-    });
-    onChange(state.v);
-  }
-  function reset() {
-    tw.clear();
-    state.v = 0; state.shown = 0; state.n = 0;
-    drawMeter(0); setNet(0);
-    sp.setAttribute('opacity', 0); somaGlow.setAttribute('opacity', 0);
-    inputs.forEach((i) => i.dots.forEach((d) => d.setAttribute('opacity', 0)));
-    Lb.fire.classList.remove('on');
-    onChange(0);
-  }
-  return { g, P: {}, Lb, send, reset, tw, TH, set onChange(fn) { onChange = fn; }, get v() { return state.v; } };
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  out.setIndex(new THREE.BufferAttribute(idx, 1));
+  return out;
 }
 
 /* ------------------------------------------------------------------ step plan */
+// Shared timeline for the main scene (seconds):
+//   0–1.4 impulse arrives · 1.0–2.2 calcium in · 1.5–3.4 vesicles fuse (exocytosis) · 2–5 diffusion · 4–5.4 binding
+//   5–7 ions flow (excitation / inhibition).   Clearing has its own timeline (0–4.4 s).
+const T_END = 7.2;
 const PLAN = [
-  { scene: 'main', at: 0, labels: ['pre', 'cleft', 'post'], cap: 'A synapse: two neurons and the tiny gap between them' },
-  { scene: 'main', range: [0, 1700], lit: ['pre', 'vesicles', 'nt'], labels: ['ap'], cap: 'Step 1: the action potential arrives at the presynaptic terminal' },
-  { scene: 'main', range: [1300, 3700], lit: ['pre', 'vesicles', 'nt'], labels: ['vesicle', 'nt', 'exo'], cap: 'Step 2: vesicles fuse with the membrane and release neurotransmitter' },
-  { scene: 'main', range: [2900, 5000], lit: ['nt'], labels: ['diff'], cap: 'Step 3: the neurotransmitter diffuses across the synaptic cleft' },
-  { scene: 'main', range: [4500, 6100], lit: ['nt', 'receptors'], labels: ['receptor', 'wrong'], wrong: true, cap: 'Step 4: it binds only to receptors with the matching shape' },
-  { scene: 'main', range: [2900, 6800], lit: ['nt', 'receptors', 'post', 'meter'], meter: true, ei: true, cap: '' },
-  { scene: 'sum', cap: '' },
-  { scene: 'main', removal: true, lit: ['pre', 'nt', 'clear', 'receptors', 'meter'], meter: true, labels: ['reuptake', 'enzyme'], cap: 'Step 7: reuptake and enzymes clear the neurotransmitter away' },
-  { scene: 'main', range: [0, 6800], meter: true, labels: ['elec', 'chem', 'oneway'], cap: 'Electrical inside the neuron, chemical across the gap, one way only' },
+  { view: 'overview', at: 0, labels: ['pre', 'cleft', 'post'], cap: 'A synapse, cut open: the end of one neuron, a tiny gap, and the next neuron.' },
+  { view: 'overview', range: [0, 2.2], labels: ['ap', 'ca'], cap: 'Step 1: the action potential arrives at the presynaptic terminal' },
+  { view: 'zone', range: [1.2, 3.6], labels: ['vesicle', 'nt', 'exo'], cap: 'Step 2: vesicles fuse with the membrane and release neurotransmitter' },
+  { view: 'zone', range: [2.6, 5.0], labels: ['diff'], cap: 'Step 3: the neurotransmitter diffuses across the synaptic cleft' },
+  { view: 'receptor', range: [3.8, 5.6], labels: ['receptor', 'wrong'], wrong: true, cap: 'Step 4: it binds only to receptors with the matching shape' },
+  { view: 'effect', range: [4.6, T_END], labels: ['ions', 'receptor'], ei: true, meter: true, cap: '' },
+  { view: 'sum', cap: '' },
+  { view: 'clear', removal: true, labels: ['reuptake', 'enzyme'], cap: 'Step 7: reuptake and enzymes clear the neurotransmitter away' },
+  { view: 'overview', range: [0, T_END], labels: ['elec', 'chem', 'oneway'], cap: 'Electrical inside the neuron, chemical across the gap, one way only' },
 ];
 const INTRO = PLAN[0];
-const RECAP = { scene: 'main', at: T_END, meter: true, labels: ['elec', 'chem', 'oneway'], cap: 'The whole process, from top to bottom' };
-const EI_CAP = { e: 'Excitatory: the inside becomes more positive, so it is more likely to fire', i: 'Inhibitory: the inside becomes more negative, so it is less likely to fire' };
+const RECAP = { view: 'overview', at: T_END, labels: ['elec', 'chem', 'oneway'], cap: 'The whole process, from top to bottom' };
+const EI_CAP = { e: 'Excitatory: the inside becomes more positive, so it is more likely to fire', i: 'Inhibitory: the inside becomes more negative, so it is less likely to fire. Real inhibitory synapses are usually on the cell body or the dendrite itself.' };
+const NOTE_MAIN = 'A model, not a scan. Molecules drawn much bigger, and far fewer';
 
 /* ------------------------------------------------------------------ lesson */
 export default {
@@ -619,95 +265,533 @@ export default {
   visual: {
     dark: true,
     async create(container) {
-      const wrap = document.createElement('div');
-      wrap.className = 'fill syn-vis';
-      const style = document.createElement('style'); style.textContent = CSS; wrap.append(style);
-      container.append(wrap);
-      const svg = s('svg', { viewBox: '0 0 800 600', class: 'diagram', role: 'img', preserveAspectRatio: 'xMidYMid meet' }, wrap);
-      defs(svg);
+      const style = document.createElement('style'); style.textContent = CSS; container.append(style);
+      const loading = document.createElement('div'); loading.className = 'syn3d-loading'; loading.textContent = 'Loading the 3D synapse…';
+      container.append(loading);
       const controls = document.createElement('div'); controls.className = 'vis-controls'; container.append(controls);
-      const cap = document.createElement('p'); cap.className = 'vis-caption'; container.append(cap);
+      const note = document.createElement('p'); note.className = 'syn3d-note'; note.hidden = true; container.append(note);
+      const meter = document.createElement('div'); meter.className = 'syn3d-meter'; meter.hidden = true; meter.setAttribute('aria-hidden', 'true');
+      meter.innerHTML = `<h4>Inside the next neuron</h4><div class="end">+</div><div class="track"><div class="zero"></div><div class="th" hidden></div><div class="fill"></div><div class="dot"></div></div><div class="end">−</div><div class="thl" hidden>Dashed line: threshold</div>`;
+      container.append(meter);
+      const cap = document.createElement('p'); cap.className = 'vis-caption syn3d-cap'; container.append(cap);
       const live = document.createElement('p'); live.className = 'sr-only'; live.setAttribute('aria-live', 'polite'); container.append(live);
 
-      const main = buildMain(svg);
-      const sum = buildSum(svg);
-      const scenes = { main, sum };
-      const tw = makeTweens();
-      let current = null, eiType = 'e';
+      const stage = createStage(container, {
+        label: '3D synapse',
+        safeTop: () => (controls.childElementCount ? controls.offsetTop + controls.offsetHeight + 6 : 16),
+        safeBottom: () => container.clientHeight - cap.offsetTop + 6,
+      });
+      container.insertBefore(stage.host, controls);
 
-      const setCap = (text) => { cap.textContent = text; svg.setAttribute('aria-label', text); };
-      const fitLabels = (sc) => Object.values(sc.Lb).forEach((l) => l.fit?.());
-      document.fonts?.ready?.then(() => { if (current) fitLabels(scenes[current.scene]); });
+      const [ampa, gaba, sert, ache, pyr] = await Promise.all([loadMol(MOL.ampa), loadMol(MOL.gaba), loadMol(MOL.sert), loadMol(MOL.ache), loadSWC(PYR)]);
+      loading.remove();
+      const calm = () => get('calm') === 'true';
 
-      const btn = (text, onClick, extra = {}) => {
-        const b = document.createElement('button'); b.type = 'button'; b.textContent = text;
-        for (const k in extra) b.setAttribute(k, extra[k]);
-        b.addEventListener('click', onClick); controls.append(b); return b;
+      /* ============================================================ main scene (units: nm; 1 world unit = 100 nm) */
+      const main = new THREE.Group(); main.scale.setScalar(0.01);
+      const clip = new THREE.Plane(V(0, 0, -1), 0);
+      const preU = { uAPy: { value: -1e6 }, uAPGlow: { value: 0 } };
+      const postU = { uInnerGlow: { value: new THREE.Color(0, 0, 0) } };
+      const pre = lathe([[0, 20], [120, 20], [200, 24], [265, 48], [310, 110], [330, 200], [322, 300], [285, 390], [220, 470], [150, 540], [105, 620], [92, 760], [90, 980]]);
+      const preMesh = new THREE.Mesh(pre.geo, membraneMaterial('#EBA6BF', '#A65C80', clip, preU));
+      const spine = lathe([[0, 0], [140, 0], [215, -10], [262, -55], [282, -140], [262, -235], [200, -310], [120, -365], [72, -420], [62, -500], [66, -580], [90, -640], [140, -690]]);
+      const postMat = membraneMaterial('#B7A4F2', '#9A90DA', clip, postU);
+      const spineMesh = new THREE.Mesh(spine.geo, postMat);
+      const shaftGeo = new THREE.CylinderGeometry(230, 230, 1700, 96, 1, true); shaftGeo.rotateZ(Math.PI / 2); shaftGeo.translate(0, -860, 0);
+      const shaft = new THREE.Mesh(shaftGeo, postMat);
+      const edgeMat = new THREE.MeshStandardMaterial({ color: '#FFE3EF', roughness: 0.5, emissive: new THREE.Color('#3A2030') });
+      const edgeMatPost = new THREE.MeshStandardMaterial({ color: '#E6DEFF', roughness: 0.5, emissive: new THREE.Color('#201A40') });
+      const preEdge = cutOutline(pre.profile, 3.5, edgeMat);
+      const spineEdge = cutOutline(spine.profile, 3.5, edgeMatPost);
+      const shaftEdges = [-1, 1].map((sg) => new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.5, 1700, 6).rotateZ(Math.PI / 2).translate(0, -860 + sg * 230, 0.5), edgeMatPost));
+      main.add(preMesh, spineMesh, shaft, preEdge, spineEdge, ...shaftEdges);
+
+      // vesicles: a reserve pool (static) and four docked at the active zone (three of them release)
+      const rand = rng(11);
+      const profR = (y) => { let best = 0; for (const p of pre.profile) if (Math.abs(p.y - y) < 12) best = Math.max(best, p.x); return best; };
+      const vesMat = new THREE.MeshPhysicalMaterial({ color: '#F4E6FF', roughness: 0.22, clearcoat: 0.6, transparent: true, opacity: 0.82, sheen: 0.3, sheenColor: new THREE.Color('#ffffff') });
+      const vesGeo = new THREE.SphereGeometry(20, 28, 18);
+      const pool = [];
+      for (let tries = 0; pool.length < 46 && tries < 4000; tries++) {
+        const y = 85 + rand() * 400; const R = profR(y) - 38; if (R < 30) continue;
+        const a = Math.PI + rand() * Math.PI; const r = Math.sqrt(rand()) * R;
+        const p = V(Math.cos(a) * r, y, Math.sin(a) * r);
+        if (p.z > -24) continue;
+        if (pool.some((q) => q.distanceTo(p) < 46)) continue;
+        pool.push(p);
+      }
+      const poolMesh = new THREE.InstancedMesh(vesGeo, vesMat, pool.length);
+      const mtx = new THREE.Matrix4();
+      pool.forEach((p, i) => { mtx.makeTranslation(p.x, p.y, p.z); poolMesh.setMatrixAt(i, mtx); });
+      main.add(poolMesh);
+      const DOCK = [V(-118, 46, -46), V(-38, 46, -74), V(44, 46, -34), V(122, 46, -62)];
+      const docked = DOCK.map((p) => { const m = new THREE.Mesh(vesGeo, vesMat); m.position.copy(p); main.add(m); return m; });
+      const FUSE = [1.5, 1.85, 2.2];   // fusion start times for docked vesicles 0..2 (3 stays docked)
+
+      // receptors in the postsynaptic density (only behind the cut plane)
+      const recSpots = [];
+      for (let tries = 0; recSpots.length < 11 && tries < 3000; tries++) {
+        const a = Math.PI + rand() * Math.PI, r = Math.sqrt(rand()) * 150;
+        const p = V(Math.cos(a) * r, -3, Math.sin(a) * r);
+        if (p.z > -12) continue;
+        if (recSpots.some((q) => Math.hypot(q.x - p.x, q.z - p.z) < 36)) continue;
+        recSpots.push(p);
+      }
+      const recRot = recSpots.map(() => rand() * Math.PI * 2);
+      let FOCUS = 0; recSpots.forEach((p, j) => { if (Math.hypot(p.x, p.z + 30) < Math.hypot(recSpots[FOCUS].x, recSpots[FOCUS].z + 30)) FOCUS = j; });
+      const siteOf = (geo, r, y) => {   // the mesh vertex nearest a target point on the protein surface
+        const pos = geo.attributes.position; let best = null, bd = Infinity; const t = V(r, y, 0); const v = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i); const d = v.distanceToSquared(t); if (d < bd) { bd = d; best = v.clone(); } }
+        return best;
       };
+      const protMat = (c) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.4, clearcoat: 0.35, sheen: 0.35, sheenColor: new THREE.Color('#ffffff'), side: THREE.DoubleSide });
+      const RECEPTOR = {
+        e: { geo: ampa.geo, color: '#3FC4B0', site: siteOf(ampa.geo, 6, 7.5), pdb: '3KG2', name: 'glutamate receptor' },
+        i: { geo: gaba.geo, color: '#8F8CFF', site: siteOf(gaba.geo, 5, 5.5), pdb: '6HUP', name: 'GABA-A receptor' },
+      };
+      for (const k of ['e', 'i']) {
+        const R = RECEPTOR[k];
+        const im = new THREE.InstancedMesh(R.geo, protMat('#ffffff'), recSpots.length);
+        const base = new THREE.Color(R.color);
+        recSpots.forEach((p, j) => { mtx.makeRotationY(recRot[j]).setPosition(p); im.setMatrixAt(j, mtx); im.setColorAt(j, base); });
+        im.instanceColor.needsUpdate = true;
+        R.mesh = im; R.base = base; main.add(im);
+        R.sites = recSpots.map((p, j) => R.site.clone().applyAxisAngle(V(0, 1, 0), recRot[j]).add(p));
+        R.tops = recSpots.map((p) => p.clone().add(V(0, k === 'e' ? 15 : 9, 0)));
+      }
+      // reuptake transporters (presynaptic membrane, outside facing the cleft) and enzymes (in the cleft)
+      const tSpots = [V(-150, 21, -34), V(-170, 21, -150), V(200, 21, -95), V(150, 21, -175), V(-60, 21, -215), V(80, 21, -215)];
+      const tMesh = new THREE.InstancedMesh(sert.geo, protMat('#F2A06A'), tSpots.length);
+      tSpots.forEach((p, j) => { mtx.makeRotationX(Math.PI).premultiply(new THREE.Matrix4().makeRotationY(j * 1.7)).setPosition(p.x, p.y + 1, p.z); tMesh.setMatrixAt(j, mtx); });
+      const eSpots = [V(-245, 9, -60), V(150, 9, -32), V(-120, 9, -190), V(140, 10, -200), V(10, 9, -250)];
+      const eMesh = new THREE.InstancedMesh(ache.geo, protMat('#A3DB6E'), eSpots.length);
+      eSpots.forEach((p, j) => { mtx.makeRotationFromEuler(new THREE.Euler(j * 0.9, j * 1.3, j * 0.4)).setPosition(p); eMesh.setMatrixAt(j, mtx); });
+      main.add(tMesh, eMesh);
 
-      function play(plan) {
-        tw.clear();
-        if (plan.removal) { main.renderRemoval(0); tw.add(3900, (u) => main.renderRemoval(u * 3900)); return; }
-        if (plan.range) {
-          const [a, b] = plan.range;
-          main.render(a);
-          tw.add(b - a, (u) => main.render(a + (b - a) * u));
-        } else main.render(plan.at ?? 0);
+      // neurotransmitter particles: 14 per releasing vesicle
+      const N_PER = 14, NP = N_PER * FUSE.length;
+      const ntGeo = { e: moleculeGeo('e'), i: moleculeGeo('i'), wrong: moleculeGeo('wrong') };
+      const ntMat = (c) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.3, clearcoat: 0.6, emissive: new THREE.Color(c), emissiveIntensity: 0.25 });
+      const ntMesh = { e: new THREE.InstancedMesh(ntGeo.e, ntMat(COL.e), NP), i: new THREE.InstancedMesh(ntGeo.i, ntMat(COL.i), NP) };
+      main.add(ntMesh.e, ntMesh.i);
+      const wrongMesh = new THREE.InstancedMesh(ntGeo.wrong, ntMat(COL.wrong), 1); main.add(wrongMesh);
+      const fragMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1.7, 10, 8), ntMat('#E8D9A8'), NP * 2); main.add(fragMesh);
+      const particles = [];
+      let siteUse = recSpots.map(() => 0);
+      for (let i = 0; i < NP; i++) {
+        const k = Math.floor(i / N_PER);
+        const off = V(rand() - 0.5, rand() - 0.5, rand() - 0.5).multiplyScalar(22);
+        const tr = FUSE[k] + 0.5 + rand() * 0.3;
+        let target, site = -1;
+        if (i % 3 !== 2) {
+          // nearest receptor with a free site
+          let best = -1, bd = Infinity;
+          recSpots.forEach((p, j) => { if (siteUse[j] >= 2) return; const d = Math.hypot(p.x - DOCK[k].x, p.z - DOCK[k].z) + rand() * 60; if (d < bd) { bd = d; best = j; } });
+          if (best >= 0) { site = best; siteUse[best]++; }
+        }
+        if (site < 0) target = V((rand() - 0.5) * 380, 6 + rand() * 10, -20 - rand() * 180);
+        const ph = [rand() * 6.28, rand() * 6.28, rand() * 6.28, rand() * 6.28];
+        const rot = new THREE.Quaternion().setFromEuler(new THREE.Euler(rand() * 6, rand() * 6, rand() * 6));
+        const removal = i % 2 === 0 ? { kind: 'reuptake', j: i % tSpots.length } : { kind: 'enzyme', j: i % eSpots.length };
+        particles.push({ k, off, tr, ta: tr + 1.3 + rand() * 1.0, site, target, ph, rot, removal, spin: rand() * 2 - 1 });
+      }
+      const pore = (k) => V(DOCK[k].x, 14, DOCK[k].z);
+      const vesState = (k, t) => {
+        if (k >= FUSE.length) return { p: DOCK[k], s: 1 };
+        const u = seg(t, FUSE[k], FUSE[k] + 1.0);
+        return { p: V(DOCK[k].x, 46 - 22 * easeOut(Math.min(1, u * 1.4)), DOCK[k].z), s: 1 - smooth(seg(u, 0.35, 1.0)) };
+      };
+      const tmpQ = new THREE.Quaternion(), tmpS = new THREE.Vector3(), tmpP = new THREE.Vector3();
+      let mode = 'e';
+      function wander(p, t, amp = 1) {   // gentle Brownian-looking jitter
+        return V(Math.sin(t * 1.7 + p.ph[0]) * 6 + Math.sin(t * 3.1 + p.ph[1]) * 3, Math.sin(t * 2.3 + p.ph[2]) * 2.2, Math.cos(t * 1.9 + p.ph[3]) * 6).multiplyScalar(amp);
+      }
+      function particlePos(p, t, R) {
+        const pr = pore(p.k);
+        if (t < p.tr) { const vs = vesState(p.k, t); return { pos: vs.p.clone().addScaledVector(p.off, 0.9 * Math.max(0.35, vs.s)), vis: vs.s > 0.02 || t >= p.tr - 0.05, bound: false }; }
+        const end = p.site >= 0 ? R.sites[p.site].clone() : p.target.clone();
+        const u = seg(t, p.tr, p.ta);
+        if (u < 1) {
+          const e = easeOut(u);
+          const pos = pr.clone().lerp(end, e);
+          const env = Math.sin(Math.PI * u);
+          pos.x += (Math.sin(u * 9 + p.ph[0]) * 24 + Math.sin(u * 17 + p.ph[1]) * 9) * env;
+          pos.z += (Math.cos(u * 8 + p.ph[2]) * 24) * env;
+          pos.y = Math.min(16, Math.max(3, pos.y + Math.sin(u * 11 + p.ph[3]) * 4 * env));
+          return { pos, vis: true, bound: false };
+        }
+        return { pos: end.add(p.site >= 0 ? V(0, 0, 0) : wander(p, t)), vis: true, bound: p.site >= 0 };
+      }
+      // calcium ions (step 1) and sodium / chloride ions (step 5)
+      const caMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(2.4, 10, 8), ntMat(COL.ca), 12); main.add(caMesh);
+      const ionMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(2.2, 10, 8), ntMat(COL.na), 40); main.add(ionMesh);
+      const ions = Array.from({ length: 40 }, (_, i) => ({ j: i % recSpots.length, te: 5.0 + rand() * 1.5, a: rand() * 6.28, r: 20 + rand() * 120, d: 40 + rand() * 120, o: V((rand() - 0.5) * 4, 0, (rand() - 0.5) * 4) }));
+      const cas = Array.from({ length: 12 }, (_, i) => ({ k: i % 3, t0: 0.9 + rand() * 0.6, o: V((rand() - 0.5) * 50, 0, (rand() - 0.5) * 30) }));
+      const hide = (im, i) => { mtx.makeScale(0, 0, 0); im.setMatrixAt(i, mtx); };
+
+      /** Draw the main scene at time t of the shared timeline. */
+      function render(t, { wrong = false } = {}) {
+        const R = RECEPTOR[mode];
+        // impulse arriving down the axon into the terminal
+        preU.uAPy.value = 980 - 1000 * easeOut(seg(t, 0, 1.3));
+        preU.uAPGlow.value = (calm() ? 0.3 : 1) * (t > 0 && t < 1.9 ? 1 - seg(t, 1.3, 1.9) : 0);
+        // vesicles
+        for (let k = 0; k < DOCK.length; k++) { const vs = vesState(k, t); docked[k].position.copy(vs.p); docked[k].scale.setScalar(Math.max(0.0001, vs.s)); docked[k].visible = vs.s > 0.01; }
+        // calcium
+        cas.forEach((c, i) => {
+          const u = seg(t, c.t0, c.t0 + 0.9);
+          if (u <= 0 || u >= 1 || t > 2.4) { hide(caMesh, i); return; }
+          const p = V(DOCK[c.k].x + c.o.x, 2 + 70 * easeOut(u), DOCK[c.k].z + c.o.z);
+          mtx.makeScale(1, 1, 1).setPosition(p); caMesh.setMatrixAt(i, mtx);
+        });
+        caMesh.instanceMatrix.needsUpdate = true;
+        // neurotransmitter
+        const im = ntMesh[mode]; ntMesh.e.visible = mode === 'e'; ntMesh.i.visible = mode === 'i';
+        const bound = recSpots.map(() => 0);
+        particles.forEach((p, i) => {
+          const s = particlePos(p, t, R);
+          if (!s.vis) { hide(im, i); return; }
+          if (s.bound) bound[p.site]++;
+          tmpQ.copy(p.rot); if (!s.bound) tmpQ.multiply(new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), t * p.spin));
+          mtx.compose(s.pos, tmpQ, tmpS.set(1, 1, 1)); im.setMatrixAt(i, mtx);
+        });
+        im.instanceMatrix.needsUpdate = true;
+        for (let i = 0; i < NP * 2; i++) hide(fragMesh, i); fragMesh.instanceMatrix.needsUpdate = true;
+        // receptors light up when something is bound
+        const lit = new THREE.Color();
+        recSpots.forEach((_, j) => { lit.copy(R.base).lerp(new THREE.Color('#ffffff'), bound[j] ? 0.3 : 0); R.mesh.setColorAt(j, lit); });
+        R.mesh.instanceColor.needsUpdate = true;
+        RECEPTOR.e.mesh.visible = mode === 'e'; RECEPTOR.i.mesh.visible = mode === 'i';
+        // the wrong-shaped molecule bounces off (step 4 only)
+        if (wrong) {
+          const site = R.sites[FOCUS], start = V(site.x - 45, 15, site.z + 6), back = V(site.x + 40, 16, site.z + 8);
+          const u1 = seg(t, 3.9, 4.8), u2 = seg(t, 4.8, 5.6);
+          const p = u2 > 0 ? site.clone().add(V(0, 3, 0)).lerp(back, easeOut(u2)) : start.clone().lerp(site.clone().add(V(0, 3, 0)), smooth(u1));
+          mtx.compose(p, new THREE.Quaternion().setFromAxisAngle(V(0.3, 1, 0.2).normalize(), t * 1.3), tmpS.set(1, 1, 1));
+          wrongMesh.setMatrixAt(0, mtx); wrongMesh.visible = t > 3.85;
+        } else wrongMesh.visible = false;
+        wrongMesh.instanceMatrix.needsUpdate = true;
+        // ions flowing through the open receptors into the spine
+        const ionCol = new THREE.Color(mode === 'e' ? COL.na : COL.cl);
+        ionMesh.material.color.copy(ionCol); ionMesh.material.emissive.copy(ionCol);
+        ions.forEach((o, i) => {
+          const u = seg(t, o.te, o.te + 1.4);
+          if (u <= 0 || !bound[o.j] && t < T_END) { hide(ionMesh, i); return; }
+          const top = recSpots[o.j].clone().add(V(0, 12, 0));
+          let p;
+          if (u < 0.45) p = top.clone().lerp(recSpots[o.j].clone().add(V(0, -8, 0)), smooth(u / 0.45)).add(o.o);
+          else { const w = smooth((u - 0.45) / 0.55); p = recSpots[o.j].clone().add(V(Math.cos(o.a) * o.r * w * 0.5, -8 - o.d * w, Math.sin(o.a) * o.r * w * 0.35 - 6 * w)); }
+          if (p.z > -4) p.z = -4;
+          mtx.makeTranslation(p.x, p.y, p.z); ionMesh.setMatrixAt(i, mtx);
+        });
+        ionMesh.instanceMatrix.needsUpdate = true;
+        const eff = smooth(seg(t, 5.2, 6.9));
+        const gl = (calm() ? 0.08 : 0.2) * eff;
+        postU.uInnerGlow.value.set(mode === 'e' ? '#FF9A3D' : '#3D8BFF').multiplyScalar(gl);
+        return eff;
       }
 
+      /** Clearing the cleft: reuptake into the terminal, or broken down by an enzyme. */
+      function renderRemoval(t) {
+        render(T_END);
+        const R = RECEPTOR[mode];
+        const im = ntMesh[mode];
+        const back = new THREE.Color();
+        recSpots.forEach((_, j) => { back.copy(R.base).lerp(new THREE.Color('#ffffff'), 0.45 * (1 - seg(t, 0.2, 0.8))); R.mesh.setColorAt(j, back); });
+        R.mesh.instanceColor.needsUpdate = true;
+        postU.uInnerGlow.value.multiplyScalar(1 - seg(t, 0, 1.2));
+        for (let i = 0; i < ionMesh.count; i++) hide(ionMesh, i); ionMesh.instanceMatrix.needsUpdate = true;
+        particles.forEach((p, i) => {
+          const s = particlePos(p, T_END, R);
+          const delay = (i % 7) * 0.12;
+          const u1 = seg(t, 0.3 + delay, 2.3 + delay);
+          const dest = p.removal.kind === 'reuptake' ? tSpots[p.removal.j].clone().add(V(0, -7, 0)) : eSpots[p.removal.j].clone().add(V(0, -2, 0));
+          let pos = s.pos.clone().add(V(0, 4 * smooth(seg(t, delay, 0.3 + delay)), 0)).lerp(dest, smooth(u1));
+          pos.add(wander(p, t, Math.sin(Math.PI * u1) * 2));
+          let scale = 1;
+          const u2 = seg(t, 2.3 + delay, 3.4 + delay);
+          if (p.removal.kind === 'reuptake') {
+            if (u2 > 0) { pos = dest.clone().add(V(0, 70 * easeOut(u2), 0)); scale = 1 - smooth(seg(u2, 0.4, 1)); }
+            hide(fragMesh, i * 2); hide(fragMesh, i * 2 + 1);
+          } else {
+            scale = u2 > 0 ? 0 : 1;
+            for (let h = 0; h < 2; h++) {
+              if (u2 <= 0 || u2 >= 1) { hide(fragMesh, i * 2 + h); continue; }
+              const dir = V(h ? 1 : -1, 0.4, h ? 0.3 : -0.3).normalize();
+              const fp = dest.clone().addScaledVector(dir, 4 + 26 * easeOut(u2));
+              const fs = 1 - smooth(seg(u2, 0.5, 1));
+              mtx.makeScale(fs, fs, fs).setPosition(fp); fragMesh.setMatrixAt(i * 2 + h, mtx);
+            }
+          }
+          if (scale <= 0.001) { hide(im, i); return; }
+          mtx.compose(pos, p.rot, tmpS.set(scale, scale, scale)); im.setMatrixAt(i, mtx);
+        });
+        im.instanceMatrix.needsUpdate = true; fragMesh.instanceMatrix.needsUpdate = true;
+      }
+
+      const W = (x, y, z) => main.localToWorld(V(x, y, z));
+      const LBL = {
+        pre: { text: 'Presynaptic terminal', sub: 'the end of the first neuron', at: () => W(-322, 250, 0), side: 'left', dist: 60 },
+        cleft: { text: 'Synaptic cleft', sub: 'the gap: about 20 nm (20 millionths of a millimetre)', at: () => W(-215, 10, -10), side: 'left', dist: 70 },
+        post: { text: 'Postsynaptic neuron', sub: 'here, a spine on a dendrite', at: () => W(-282, -150, 0), side: 'left', dist: 60 },
+        ap: { text: 'Action potential arrives', sub: 'electrical', at: () => W(-95, 650, 0), side: 'right', dist: 140 },
+        ca: { text: 'Calcium ions flow in', at: () => W(-60, 40, -50), side: 'right', dist: 150 },
+        vesicle: { text: 'Synaptic vesicle', sub: 'full of neurotransmitter', at: () => W(122, 60, -62), side: 'right', dist: 70 },
+        nt: { text: 'Neurotransmitter', sub: 'drawn much bigger than real', at: () => main.localToWorld(particlePos(particles[3], lastT, RECEPTOR[mode]).pos), side: 'left', dist: 80 },
+        exo: { text: 'Exocytosis', sub: 'the vesicle joins the membrane', at: () => W(-38, 22, -74), side: 'top', dist: 120, offset: [-60, 0] },
+        diff: { text: 'Diffusion', sub: 'spreading across the gap', at: () => W(0, 10, -60), side: 'right', dist: 140, offset: [0, -60] },
+        receptor: { text: 'Receptor', sub: '', at: () => main.localToWorld(RECEPTOR[mode].tops[FOCUS].clone()), side: 'left', dist: 90 },
+        wrong: { text: 'Wrong shape', sub: 'it cannot bind', at: () => wrongMesh.visible ? (wrongMesh.getMatrixAt(0, mtx), main.localToWorld(tmpP.setFromMatrixPosition(mtx).clone())) : null, side: 'right', dist: 90 },
+        ions: { text: 'Positive ions flow in', sub: 'the inside becomes more positive', at: () => W(0, -70, -40), side: 'left', dist: 90 },
+        reuptake: { text: 'Reuptake', sub: 'a transporter protein takes it back in', tag: 'example shape: a serotonin transporter (PDB 5I6X)', at: () => W(-150, 20, -34), side: 'top', dist: 120, offset: [-40, 0] },
+        enzyme: { text: 'Enzyme', sub: 'breaks it down', tag: 'example shape: acetylcholinesterase (PDB 4EY4)', at: () => W(150, 9, -32), side: 'bottom', dist: 110 },
+        elec: { text: 'Electrical', sub: 'the impulse inside the neuron', at: () => W(-95, 600, 0), side: 'right', dist: 150 },
+        chem: { text: 'Chemical', sub: 'neurotransmitter crosses the gap', at: () => W(-150, 10, -30), side: 'left', dist: 90 },
+        oneway: { text: 'One way only', sub: 'vesicles only here, receptors only there', at: () => W(120, -6, -40), side: 'right', dist: 110, offset: [0, 40] },
+      };
+      const VIEWS = {
+        overview: { box: [V(-360, -1000, -330), V(360, 900, 0)], dir: V(0.42, 0.16, 1) },
+        zone: { box: [V(-165, -25, -110), V(165, 105, 0)], dir: V(0.22, 0.1, 1) },
+        receptor: { box: [V(recSpots[FOCUS].x - 60, -6, recSpots[FOCUS].z - 20), V(recSpots[FOCUS].x + 60, 30, 0)], dir: V(0.1, 0.06, 1) },
+        effect: { box: [V(-210, -220, -150), V(210, 110, 0)], dir: V(0.3, 0.12, 1) },
+        clear: { box: [V(-200, -25, -120), V(200, 80, 0)], dir: V(0.15, 0.12, 1) },
+      };
+      stage.root.add(main);
+
+      /* ============================================================ summation scene (a real human neuron) */
+      const sum = new THREE.Group(); sum.scale.setScalar(0.01); sum.visible = false; stage.root.add(sum);
+      const neuron = buildNeuron(pyr, { minRadius: 0.7, step: 3, radial: 7, nucleus: false, myelin: { start: 42, internode: 70, gap: 10, thickness: 3.2, endPad: 60 }, terminals: { radius: 2.4 } });
+      sum.add(neuron.group);
+      const sc = neuron.soma.center;
+      const pickDend = (dir, lo, hi) => {
+        let b = null, bs = -Infinity;
+        for (const nd of neuron.nodes) {
+          if (nd.type !== 3) continue; const d = neuron.D.get(nd.id); if (d < lo || d > hi) continue;
+          const v = V(nd.x, nd.y, nd.z).sub(sc).normalize(); const s2 = v.dot(dir);
+          if (s2 > bs) { bs = s2; b = nd; }
+        }
+        return V(b.x, b.y, b.z);
+      };
+      const inputs = [
+        { kind: 'e', at: pickDend(V(-1, 0.1, 0.2).normalize(), 55, 85) },
+        { kind: 'e', at: pickDend(V(0.9, -0.2, 0.3).normalize(), 55, 85) },
+        { kind: 'i', at: sc.clone().add(V(-neuron.soma.radius * 0.95, -neuron.soma.radius * 0.5, neuron.soma.radius * 0.5)) },
+      ].map((inp) => {
+        const out = inp.at.clone().sub(sc).setY(inp.at.y - sc.y + 30).normalize();
+        const bp = inp.at.clone().addScaledVector(out, 7.5);
+        const col = COL[inp.kind];
+        const bm = new THREE.Mesh(new THREE.SphereGeometry(6.5, 24, 16), tissueMaterial(col, { emissive: new THREE.Color(col), emissiveIntensity: 0.15 }));
+        bm.position.copy(bp);
+        const stubEnd = bp.clone().addScaledVector(out, 70).add(V(0, 25, 0));
+        const stub = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([bp, bp.clone().lerp(stubEnd, 0.5).add(V(6, 4, 0)), stubEnd]), 24, 1.8, 8), tissueMaterial(col));
+        sum.add(bm, stub);
+        return { ...inp, bp, mesh: bm };
+      });
+      const sparkIn = createSpark(undefined, 0.16); const sparkAx = createSpark(undefined, 0.3);
+      stage.root.add(sparkIn, sparkAx);
+      const SW = (p) => sum.localToWorld(p.clone());
+      const SUM_LBL = {
+        e: { text: 'Excitatory synapses (+)', at: () => SW(inputs[0].bp), side: 'left', dist: 70 },
+        e2: { text: 'Excitatory (+)', at: () => SW(inputs[1].bp), side: 'top', dist: 70 },
+        i: { text: 'Inhibitory synapse (−)', at: () => SW(inputs[2].bp), side: 'bottom', dist: 90, offset: [-60, 0] },
+        fire: { text: 'It fires!', sub: 'an action potential travels down the axon', at: () => neuron.anchor('axonMid') && neuron.pointAt(110), side: 'right', dist: 80 },
+      };
+      const sumBox = () => { const c = SW(sc); return new THREE.Box3(c.clone().add(V(-1.15, -1.5, -0.6)), c.clone().add(V(1.15, 0.9, 0.6))); };
+
+      /* ============================================================ animation plumbing */
+      let anim = null, lastT = 0;
+      const tickers = new Set();
+      stage.onFrame((dt) => {
+        updatePixelScale(stage.camera, stage.size.h);
+        let busy = neuron.update(dt);
+        for (const f of tickers) if (f(dt)) busy = true;
+        if (anim) {
+          anim.t += dt; const done = anim.t >= anim.dur;
+          anim.fn(Math.min(anim.t, anim.dur));
+          if (done) { const a = anim; anim = null; a.done?.(); }
+          busy = true;
+        }
+        return busy;
+      });
+      function play(dur, fn, { still = dur } = {}) {
+        if (reducedMotion()) { anim = null; fn(still); stage.requestRender(); return; }
+        anim = { t: 0, dur, fn }; fn(0);
+      }
+
+      /* ---------------------------------------------------------- meter */
+      const mDot = meter.querySelector('.dot'), mFill = meter.querySelector('.fill'), mTh = meter.querySelector('.th'), mThl = meter.querySelector('.thl');
+      function setMeter(v, range = 4, th = null) {   // v in [-range, range]
+        const y = 50 - (v / range) * 50;
+        mDot.style.top = `${y}%`;
+        mFill.style.top = `${Math.min(50, y)}%`; mFill.style.height = `${Math.abs(50 - y)}%`;
+        mFill.style.background = v >= 0 ? COL.e : COL.i;
+        mTh.hidden = th == null; mThl.hidden = th == null;
+        if (th != null) mTh.style.top = `${50 - (th / range) * 50}%`;
+      }
+
+      /* ---------------------------------------------------------- summation logic */
+      const S = { v: 0, shown: 0, n: 0, touched: false, fired: false };
+      const TH = 3;
+      let sumAnims = [];
+      tickers.add((dt) => {
+        if (!sumAnims.length) return false;
+        sumAnims = sumAnims.filter((a) => { a.t += dt; a.fn(Math.min(1, a.t / a.dur)); if (a.t >= a.dur) { a.done?.(); return false; } return true; });
+        return true;
+      });
+      function sumAnim(dur, fn, done) {
+        if (reducedMotion()) { fn(1); done?.(); stage.requestRender(); return; }
+        sumAnims.push({ t: 0, dur, fn, done });
+      }
       const sumCaption = (v) => {
-        if (v === 0 && !sum.touched) return 'Send signals with the buttons. It fires at the threshold.';
+        if (v === 0 && !S.touched) return 'Send signals with the buttons. It fires at the threshold.';
         const n = `Net ${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)}.`;
-        if (v >= sum.TH) return `${n} Threshold reached: the neuron fires!`;
+        if (v >= TH) return `${n} Threshold reached: the neuron fires!`;
         if (v < 0) return `${n} Inhibition is winning, so it does not fire.`;
         return `${n} Below the threshold, so it does not fire yet.`;
       };
-      sum.onChange = (v) => { const c = sumCaption(v); setCap(c); live.textContent = c; };
+      function sumSetCaption() { const c = sumCaption(S.v); cap.textContent = c; stage.setLabel(c); live.textContent = c; }
+      function fire() {
+        S.fired = true;
+        stage.labels.set(['e', 'e2', 'i', 'fire'].map((k) => ({ key: k, ...SUM_LBL[k] })));
+        sumAnim(2.6, (u) => {
+          const G = calm() ? 0.75 : 1;
+          neuron.setFront('soma', 0, G * Math.sin(Math.PI * Math.min(1, u * 3)));
+          neuron.setFront('axon', neuron.axonFrontAt(u), u < 1 ? G : 0, 22);
+          sparkAx.visible = u > 0 && u < 1; if (sparkAx.visible) sparkAx.position.copy(neuron.pointAt(neuron.axonFrontAt(u)));
+        }, () => { neuron.setFront('axon', -1e6, 0); sparkAx.visible = false; });
+      }
+      function send(kind) {
+        S.touched = true;
+        const before = S.v;
+        S.v = Math.max(-4, Math.min(4, S.v + (kind === 'e' ? 1 : -1)));
+        const src = kind === 'e' ? inputs[S.n++ % 2] : inputs[2];
+        const path = neuron.pathToSoma(SW(src.bp));
+        path.unshift(SW(src.bp));
+        const from = S.shown, to = S.v;
+        sumSetCaption();
+        sparkIn.material.color.set(COL[kind]);
+        sumAnim(0.7, (u) => {
+          const f = u * (path.length - 1); const i = Math.min(path.length - 2, Math.floor(f));
+          sparkIn.visible = u < 1; sparkIn.position.copy(path[i]).lerp(path[i + 1], f - i);
+        }, () => {
+          sparkIn.visible = false;
+          neuron.meshes.soma.material.userData.U.uGlowCol.value.set(COL[kind]);
+          sumAnim(0.5, (u) => {
+            S.shown = from + (to - from) * smooth(u); setMeter(S.shown, 4, TH);
+            neuron.setFront('soma', 0, (calm() ? 0.4 : 0.8) * Math.sin(Math.PI * u));
+          }, () => {
+            neuron.meshes.soma.material.userData.U.uGlowCol.value.set('#FFE9A8');
+            S.shown = to; setMeter(to, 4, TH);
+            if (before < TH && to >= TH) fire();
+            if (to < TH && S.fired) { S.fired = false; stage.labels.set(['e', 'e2', 'i'].map((k) => ({ key: k, ...SUM_LBL[k] }))); }
+          });
+        });
+      }
+      function resetSum() {
+        sumAnims = []; S.v = 0; S.shown = 0; S.n = 0; S.touched = false; S.fired = false;
+        neuron.clearSignals(); sparkIn.visible = false; sparkAx.visible = false;
+        setMeter(0, 4, TH); sumSetCaption();
+        stage.labels.set(['e', 'e2', 'i'].map((k) => ({ key: k, ...SUM_LBL[k] })));
+      }
+
+      /* ---------------------------------------------------------- show */
+      let current = null, eiType = 'e';
+      const btn = (text, onClick, extra = {}) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'syn3d-btn'; b.textContent = text;
+        for (const k in extra) b.setAttribute(k, extra[k]);
+        b.addEventListener('click', onClick); controls.append(b); return b;
+      };
+      stage.onInteract(() => {
+        if (controls.querySelector('[data-reset]')) return;
+        btn('⟲ Reset view', (e) => { e.currentTarget.remove(); frame(current, false); }, { 'data-reset': '' });
+      });
+      function frame(plan, instant) {
+        if (plan.view === 'sum') { stage.fit(sumBox(), { dir: V(0.15, 0.05, 1), padding: 1.0, instant }); return; }
+        const v = VIEWS[plan.view];
+        main.updateMatrixWorld(true);
+        const box = new THREE.Box3(main.localToWorld(v.box[0].clone()), main.localToWorld(v.box[1].clone()));
+        stage.fit(box, { dir: v.dir, padding: 1.04, instant });
+      }
+      function setLabels(keys) {
+        const R = RECEPTOR[mode];
+        const list = keys.filter((k) => LBL[k]).map((k) => {
+          const spec = { key: k, ...LBL[k] };
+          if (k === 'receptor') { spec.sub = 'a protein with a matching shape'; spec.tag = `shape from a real ${R.name} (PDB ${R.pdb})`; }
+          if (k === 'ions') { spec.text = mode === 'e' ? 'Positive ions flow in' : 'Negative ions flow in'; spec.sub = mode === 'e' ? 'the inside becomes more positive' : 'the inside becomes more negative'; spec.key = `ions-${mode}`; }
+          return spec;
+        });
+        stage.labels.set(list);
+      }
+      function playMain(plan) {
+        const opts = { wrong: !!plan.wrong };
+        if (plan.removal) { play(4.6, (t) => { lastT = T_END; renderRemoval(t); }); return; }
+        if (plan.range) {
+          const [a, b] = plan.range;
+          play(b - a, (t) => {
+            lastT = a + t;
+            const eff = render(a + t, opts);
+            if (plan.meter) setMeter((mode === 'e' ? 2 : -2) * eff, 4);
+          });
+        } else { lastT = plan.at ?? 0; render(lastT, opts); }
+      }
 
       function show(step) {
         const plan = step < 0 ? INTRO : step >= PLAN.length ? RECAP : PLAN[step];
-        current = plan;
-        tw.clear(); sum.tw.clear();
-        wrap.classList.toggle('calm', get('calm') === 'true');
-        for (const [k, sc] of Object.entries(scenes)) sc.g.style.display = k === plan.scene ? '' : 'none';
-        const sc = scenes[plan.scene];
-        for (const [k, el] of Object.entries(sc.P)) el.classList.toggle('dim', !!plan.lit && !plan.lit.includes(k));
-        for (const [k, el] of Object.entries(sc.Lb)) el.classList.toggle('on', (plan.labels || []).includes(k) || (plan.scene === 'sum' && (k === 'e' || k === 'i')));
-        fitLabels(sc);
+        const prev = current; current = plan;
+        anim = null; sumAnims = [];
         controls.innerHTML = '';
         live.textContent = '';
+        const isSum = plan.view === 'sum';
+        main.visible = !isSum; sum.visible = isSum; sparkIn.visible = false; sparkAx.visible = false;
+        meter.hidden = !(isSum || plan.meter);
+        note.hidden = false;
+        note.textContent = isSum ? 'Real human neuron · myelin and synapses drawn, synapses much bigger than real' : NOTE_MAIN;
+        stage.setAO(false);   // screen-space AO leaves dark blocks at these small scales
         const motion = !reducedMotion();
 
-        if (plan.scene === 'sum') {
-          sum.touched = false;
-          sum.reset();
-          btn('+ Excitatory', () => { sum.touched = true; sum.send('e'); }, { 'aria-label': 'Send an excitatory signal (plus one)' });
-          btn('− Inhibitory', () => { sum.touched = true; sum.send('i'); }, { 'aria-label': 'Send an inhibitory signal (minus one)' });
-          btn('Reset', () => { sum.touched = false; sum.reset(); });
+        if (isSum) {
+          mode = 'e';
+          neuron.highlight(null, { instant: true });
+          btn('+ Excitatory', () => send('e'), { 'aria-label': 'Send an excitatory signal (plus one)' });
+          btn('− Inhibitory', () => send('i'), { 'aria-label': 'Send an inhibitory signal (minus one)' });
+          btn('Reset', () => resetSum());
+          resetSum();
+          frame(plan, !prev || prev.view !== 'sum');
           return;
         }
-
-        main.configure({ ...plan, type: plan.ei ? eiType : 'e' });
+        mode = plan.ei ? eiType : 'e';
         if (plan.ei) {
           const setEi = (type) => {
-            eiType = type;
+            eiType = type; mode = type;
             bE.setAttribute('aria-pressed', String(type === 'e')); bI.setAttribute('aria-pressed', String(type === 'i'));
-            main.configure({ ...plan, type });
-            setCap(EI_CAP[type]);
-            play(plan);
+            cap.textContent = EI_CAP[type]; stage.setLabel(EI_CAP[type]); live.textContent = EI_CAP[type];
+            setLabels(plan.labels);
+            playMain(plan);
           };
           const bE = btn('+ Excitatory', () => setEi('e'));
           const bI = btn('− Inhibitory', () => setEi('i'));
-          if (motion) btn('↻ Play again', () => play(plan));
+          if (motion) btn('↻ Play again', () => playMain(plan));
           setEi(eiType);
-          return;
+        } else {
+          cap.textContent = plan.cap; stage.setLabel(plan.cap);
+          setLabels(plan.labels);
+          if ((plan.range || plan.removal) && motion) btn('↻ Play again', () => playMain(plan));
+          playMain(plan);
         }
-        setCap(plan.cap);
-        if ((plan.range || plan.removal) && motion) btn('↻ Play again', () => play(plan));
-        play(plan);
+        frame(plan, !prev || prev.view === 'sum');
+        stage.requestRender();
       }
 
-      return { show, dispose() { tw.clear(); sum.tw.clear(); wrap.remove(); controls.remove(); cap.remove(); live.remove(); } };
+      return {
+        show,
+        dispose() {
+          anim = null; sumAnims = [];
+          neuron.dispose();
+          Object.values(ntGeo).forEach((g) => g.dispose());
+          stage.dispose();
+          [style, controls, note, meter, cap, live, loading].forEach((e) => e.remove());
+        },
+      };
     },
   },
 };

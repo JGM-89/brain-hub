@@ -1,39 +1,26 @@
 // Ways of studying the brain — AQA 7182 4.2.2 (A-level only).
-// Visual: hand-drawn SVG on the dark stage.
-//   - Spatial vs temporal resolution explained with "sharp vs blurry" pictures.
-//   - fMRI: oxygen-rich blood flows to active neurons; a slow haemodynamic response you can play.
-//   - EEG: electrode cap + illustrative brainwave patterns (alert, relaxed, deep sleep, seizure).
-//   - EEG vs fMRI timing side by side.
-//   - ERP averaging simulation: average 1 / 5 / 20 / 100 noisy trials and watch the ERP emerge.
-//   - Post-mortem: behaviour in life linked to damage found after death (Tan).
-//   - A spatial vs temporal resolution chart for all four methods.
+// Visual: the real 3D brain (FreeSurfer fsaverage cortex + aseg deep structures) and the real
+// fsaverage head surface, in one MNI305-based space.
+//   - fMRI: an (illustrative) BOLD activation blob on the real cortex, in the right place for the task
+//     (visual cortex for seeing; left hand motor area + SMA for right-hand finger tapping), rising with
+//     a canonical haemodynamic response (peak about 5 s), and a scanner-style axial slice.
+//   - EEG: 10–20 electrodes computed geometrically on the real head mesh (see three/eeg1020.js),
+//     an illustrative map of where each rhythm is biggest, and illustrative multi-channel traces.
+//   - ERP: averaging simulation (made-up signal + noise) as a chart beside the head.
+//   - Post-mortem: Broca's area on the left inferior frontal gyrus ("Tan"), and a real coronal slice
+//     cut through the 3D brain, revealing the hippocampus.
+import * as THREE from 'three';
+import { BrainViewer } from '../brain/viewer.js';
 import { reducedMotion } from '../settings.js';
+import { createStage, setControls, pressOnly, createLabels, createChips, createPanel, freeRectFor } from '../three/stage-ui.js';
+import { quietPicking, installViewShift, cortexLayer, createSlicer, flyTo, toWorld, snapToRegion, regionCentre, fromRAS } from '../three/brain-fx.js';
+import { createEegRig, MAPS } from '../three/eeg-rig.js';
 
-/* ------------------------------------------------------------------ colours (dark stage only) */
+/* ------------------------------------------------------------------ colours */
 const C = {
-  ink: '#ECEFF7', soft: '#AEB8D2', faint: '#5E6A8A', node: '#16223D',
-  cyan: '#73D3FF', link: '#86A8E6', amber: '#FFC965', mint: '#7DE8B4',
-  rose: '#FF8DA1', violet: '#C9AAFF', red: '#FF8A7A', o2: '#FF5C6E', deox: '#9A6AB0',
-  panel: 'rgba(255,255,255,0.045)', panelLine: 'rgba(255,255,255,0.12)',
+  ink: '#ECEFF7', soft: '#C9D2E6', faint: '#5E6A8A', cyan: '#73D3FF', amber: '#FFC965', mint: '#7DE8B4',
+  rose: '#FF8DA1', violet: '#C9AAFF', red: '#FF8A7A',
 };
-
-/* ------------------------------------------------------------------ tiny SVG helpers */
-function T(x, y, str, o = {}) {
-  const { size = 15, weight = 400, color = C.ink, anchor = 'start', lh = 1.3, cls = '', extra = '' } = o;
-  const lines = Array.isArray(str) ? str : [str];
-  return `<text x="${x}" y="${y}" font-size="${size}" font-weight="${weight}" text-anchor="${anchor}" style="fill:${color}" class="${cls}" ${extra}>${lines
-    .map((l, i) => `<tspan x="${x}" dy="${i ? (size * lh).toFixed(1) : 0}">${l}</tspan>`).join('')}</text>`;
-}
-function pill(x, y, str, o = {}) {
-  const { size = 15, color = C.ink, border = 'rgba(255,255,255,.25)', cls = '', extra = '', to = null, lead = C.soft } = o;
-  const lines = Array.isArray(str) ? str : [str];
-  const w = Math.max(...lines.map((l) => l.length)) * size * 0.56 + 20;
-  const h = lines.length * size * 1.3 + 12;
-  const leader = to ? `<line x1="${x}" y1="${y}" x2="${to[0]}" y2="${to[1]}" style="stroke:${lead}" stroke-width="1.5"/><circle cx="${to[0]}" cy="${to[1]}" r="3" style="fill:${lead}"/>` : '';
-  return `<g class="stb-pill ${cls}" ${extra}>${leader}<rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="9" style="fill:rgba(10,16,30,.9);stroke:${border}" stroke-width="1.5"/>${T(x, y - h / 2 + 6 + size * 0.98, lines, { size, weight: 700, color, anchor: 'middle' })}</g>`;
-}
-const panel = (x, y, w, h, cls = '') => `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="16" style="fill:${C.panel};stroke:${C.panelLine}" stroke-width="1.5"/>`;
-const ptsToPath = (pts) => pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ');
 
 // Seeded random numbers, so the "noise" looks the same every time the page loads.
 function mulberry32(a) {
@@ -43,43 +30,6 @@ function mulberry32(a) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-}
-
-// Side view of a brain (front on the left), drawn in a 300 x 240 box.
-const BRAIN_LAT = `
-  <path d="M176 186 C180 204 178 220 172 236 L194 236 C196 218 200 200 204 180 Z" style="fill:#1A2744;stroke:#7F95C4" stroke-width="2"/>
-  <path d="M206 172 C214 200 262 206 280 180 C286 168 276 160 266 162 C248 168 226 166 206 172 Z" style="fill:#1E2C4B;stroke:#7F95C4" stroke-width="2"/>
-  <path d="M34 128 C22 78 62 30 132 22 C196 14 262 38 284 92 C296 122 290 150 268 160 C250 168 228 166 210 170 C196 174 186 184 168 188 C140 196 104 192 86 176 C76 168 70 160 58 158 C44 156 36 146 34 128 Z" style="fill:#1A2744;stroke:#8FA6D6" stroke-width="2.2"/>
-  <g style="fill:none;stroke:#3F5078" stroke-width="2" stroke-linecap="round">
-    <path d="M92 150 C120 136 160 130 200 136" style="stroke:#55679A"/>
-    <path d="M150 20 C142 52 160 78 146 122"/>
-    <path d="M62 80 C80 68 96 86 116 72"/><path d="M76 112 C94 104 108 120 126 110"/>
-    <path d="M196 44 C212 64 232 52 246 72"/><path d="M212 104 C230 94 246 114 264 104"/>
-    <path d="M116 168 C136 160 156 172 178 164"/><path d="M226 182 C240 188 256 186 270 178"/>
-  </g>`;
-const brainLat = (tx, ty, s, inner = '') => `<g transform="translate(${tx} ${ty}) scale(${s})">${BRAIN_LAT}${inner}</g>`;
-
-// A horizontal MRI-style slice seen from above (front at the top), centred on (cx, cy).
-function wobbly(cx, cy, rx, ry, amp, lobes, phase = 0) {
-  const pts = [];
-  for (let i = 0; i <= 120; i++) {
-    const a = (i / 120) * Math.PI * 2;
-    const k = 1 + amp * Math.sin(lobes * a + phase);
-    pts.push([cx + rx * k * Math.cos(a), cy + ry * k * Math.sin(a)]);
-  }
-  return ptsToPath(pts) + ' Z';
-}
-function slice(cx, cy, s = 1, inner = '') {
-  return `<g transform="translate(${cx} ${cy}) scale(${s})">
-    <ellipse cx="0" cy="0" rx="108" ry="132" style="fill:#2B3550;stroke:#56627F" stroke-width="3"/>
-    <path d="${wobbly(0, 0, 96, 120, 0.035, 16)}" style="fill:#59647E"/>
-    <path d="${wobbly(0, 0, 76, 100, 0.06, 13, 1)}" style="fill:#97A1B8"/>
-    <line x1="0" y1="-122" x2="0" y2="-40" style="stroke:#2B3550" stroke-width="5"/>
-    <line x1="0" y1="50" x2="0" y2="122" style="stroke:#2B3550" stroke-width="5"/>
-    <path d="M-6 -36 C-30 -30 -34 10 -14 34 C-10 20 -8 -10 -6 -36 Z" style="fill:#2B3550"/>
-    <path d="M6 -36 C30 -30 34 10 14 34 C10 20 8 -10 6 -36 Z" style="fill:#2B3550"/>
-    ${inner}
-  </g>`;
 }
 
 /* ------------------------------------------------------------------ physiology-shaped curves */
@@ -110,8 +60,6 @@ const ERP_TRIALS = (() => {
 const ERP_AVG = Object.fromEntries([1, 5, 20, 100].map((n) => [n, ERP_T.map((_, i) => {
   let s = 0; for (let k = 0; k < n; k++) s += ERP_TRIALS[k][i]; return s / n;
 })]));
-const ex = (t) => 140 + (t + 100) * 0.8; // ms → x (140 … 620)
-const erpD = (arr, yc, sc) => ptsToPath(ERP_T.map((t, i) => [ex(t), yc - arr[i] * sc]));
 
 /* ------------------------------------------------------------------ EEG patterns (illustrative) */
 const EEG_KINDS = {
@@ -120,301 +68,594 @@ const EEG_KINDS = {
   sleep: { label: 'Deep sleep', title: 'Deep sleep: delta waves', desc: 'Slow and large (under 4 per second)' },
   seizure: { label: 'Epilepsy', title: 'Epileptic seizure', desc: 'Sudden bursts of large spikes' },
 };
-function eegPath(kind, x0, x1, yc, secs = 2) {
-  const r = mulberry32(kind.length * 97 + 11);
-  const pps = (x1 - x0) / secs;
-  let n = 0;
-  const pts = [];
-  for (let x = x0; x <= x1; x += 1) {
-    const t = (x - x0) / pps;
-    n = 0.8 * n + (r() - 0.5) * 1.4;
-    let v;
-    if (kind === 'alert') v = 7 * Math.sin(2 * Math.PI * 21 * t) + 4 * Math.sin(2 * Math.PI * 16 * t + 1) + 2.5 * n;
-    else if (kind === 'relaxed') v = (20 + 9 * Math.sin(2 * Math.PI * 0.9 * t)) * Math.sin(2 * Math.PI * 10 * t) + 2.5 * n;
-    else if (kind === 'sleep') v = 44 * Math.sin(2 * Math.PI * 1.4 * t + 0.5) + 14 * Math.sin(2 * Math.PI * 2.7 * t) + 3 * n;
-    else {
-      if (t < 0.6) v = 6 * Math.sin(2 * Math.PI * 18 * t) + 2.5 * n;
-      else {
-        const p = ((t - 0.6) * 3) % 1;
-        v = 66 * Math.exp(-(((p - 0.06) / 0.022) ** 2)) - 36 * Math.exp(-(((p - 0.45) / 0.17) ** 2)) + 2.5 * n;
-      }
+const TRACE_CH = [
+  { name: 'Fz', color: '#73D3FF' }, { name: 'Cz', color: '#7DE8B4' }, { name: 'Pz', color: '#FFC965' },
+  { name: 'O1', color: '#FF8DA1' }, { name: 'O2', color: '#C9AAFF' },
+];
+const FS = 250, LOOP = 8;
+const NOISE = TRACE_CH.map((_, k) => {
+  const r = mulberry32(911 + k * 31); const a = new Float32Array(FS * LOOP); let n = 0;
+  for (let i = 0; i < a.length; i++) { n = 0.8 * n + (r() - 0.5) * 1.4; a[i] = n; }
+  return a;
+});
+const TAU = Math.PI * 2;
+function eegSample(kind, t, k) {
+  const tt = ((t % LOOP) + LOOP) % LOOP;
+  const n = NOISE[k][Math.floor(tt * FS) % (FS * LOOP)];
+  const ph = k * 0.7;
+  const beta = 7 * Math.sin(TAU * 21 * t + ph) + 4 * Math.sin(TAU * 16 * t + 1 + ph) + 2.5 * n;
+  if (kind === 'alert') return beta;
+  if (kind === 'relaxed') return (20 + 9 * Math.sin(TAU * 0.9 * t)) * Math.sin(TAU * 10 * t + ph * 0.3) + 2.5 * n;
+  if (kind === 'sleep') return 44 * Math.sin(TAU * 1.4 * t + 0.5 + ph * 0.2) + 14 * Math.sin(TAU * 2.7 * t) + 3 * n;
+  // seizure: normal background, then a sudden burst of generalised 3-per-second spike-and-wave
+  if (tt < 2 || tt > 6.5) return beta;
+  const p = ((tt - 2) * 3) % 1;
+  return 66 * Math.exp(-(((p - 0.06) / 0.022) ** 2)) - 36 * Math.exp(-(((p - 0.45) / 0.17) ** 2)) + 2.5 * n;
+}
+
+/* ------------------------------------------------------------------ canvas charts (pixel units) */
+function drawTraces(g, kind, tNow, gains) {
+  const L = 46, R = 14, top = 6, bottom = 36;
+  const rowH = (g.h - top - bottom) / TRACE_CH.length;
+  const win = 3, span = g.w - L - R;
+  const sc = (rowH * 0.5) / 60;
+  TRACE_CH.forEach((ch, k) => {
+    const yc = top + rowH * (k + 0.5);
+    g.line([[L, yc], [g.w - R, yc]], 'rgba(255,255,255,.08)', 1);
+    const pts = [];
+    for (let x = 0; x <= span; x += 1.5) {
+      const t = tNow - win + (x / span) * win;
+      pts.push([L + x, yc - eegSample(kind, t, k) * gains[k] * sc]);
     }
-    pts.push([x, yc - v]);
+    g.line(pts, kind === 'seizure' ? '#FF9F8F' : ch.color, 1.6);
+    g.text(6, yc, ch.name, { weight: 700, color: ch.color, size: 15 });
+  });
+  const pps = span / win;
+  g.line([[L, g.h - 16], [L + pps, g.h - 16]], C.ink, 3);
+  g.text(L + pps + 8, g.h - 16, '1 second', { color: C.soft });
+  g.text(g.w - R, g.h - 16, 'Illustrative', { align: 'right', color: C.soft });
+}
+
+function timeAxis(g, x0, x1, y, tMax, step, label) {
+  g.line([[x0, y], [x1, y]], C.soft, 1.5);
+  for (let t = 0; t <= tMax; t += step) {
+    const x = x0 + (t / tMax) * (x1 - x0);
+    g.line([[x, y], [x, y + 6]], C.soft, 1.5);
+    g.text(x, y + 18, String(t), { align: 'center', color: C.soft });
   }
-  return ptsToPath(pts);
+  if (label) g.text(x1, y + 40, label, { align: 'right', color: C.soft });
 }
 
-/* ------------------------------------------------------------------ scenes */
-function methodsSVG() {
-  const card = (x, y, name, desc, icon) => `${panel(x, y, 300, 170)}${icon}${T(x + 140, y + 66, name, { size: 18, weight: 700 })}${T(x + 140, y + 92, desc, { color: C.soft })}`;
-  const fmriIcon = `<circle cx="80" cy="99" r="46" fill="none" style="stroke:#5B6E9E" stroke-width="12"/>${slice(80, 99, 0.24)}<circle class="glow" cx="86" cy="118" r="7" fill="${C.amber}" filter="url(#stb-glow)"/>`;
-  const eegHead = `<circle cx="396" cy="99" r="40" style="fill:#22325A;stroke:${C.soft}" stroke-width="2"/><path d="M388 60 L396 50 L404 60" fill="none" style="stroke:${C.soft}" stroke-width="2"/>${[[396, 72], [374, 84], [418, 84], [362, 104], [396, 99], [430, 104], [378, 122], [414, 122], [396, 128]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="5" fill="${C.cyan}"/>`).join('')}`;
-  const erpIcon = `<line x1="36" y1="290" x2="128" y2="290" style="stroke:${C.faint}" stroke-width="1.5"/><path class="glow" d="${ptsToPath(ERP_T.map((t, i) => [36 + (t + 100) * 0.153, 290 - ERP_SIGNAL[i] * 7]))}" fill="none" style="stroke:${C.amber}" stroke-width="3" filter="url(#stb-glow)"/>`;
-  const pmIcon = `${brainLat(338, 238, 0.32)}<circle cx="418" cy="282" r="20" fill="none" style="stroke:${C.ink}" stroke-width="4"/><line x1="432" y1="296" x2="448" y2="312" style="stroke:${C.ink}" stroke-width="6" stroke-linecap="round"/>`;
-  return `<g data-scene="methods">
-    ${card(12, 14, 'fMRI', ['Blood oxygen,', 'in a scanner'], fmriIcon)}
-    ${card(328, 14, 'EEG', ['Electrical activity', 'from the scalp'], eegHead)}
-    ${card(12, 198, 'ERP', ['Brain response', 'to one event'], erpIcon)}
-    ${card(328, 198, 'Post-mortem', ['The brain studied', 'after death'], pmIcon)}
-  </g>`;
+function drawFmriTime(g, t) {
+  const x0 = 14, x1 = g.w - 16, X = (s) => x0 + (s / 12) * (x1 - x0);
+  const yN = Math.min(70, g.h * 0.2), yB = g.h - 62, hB = Math.max(60, yB - yN - 64);
+  g.text(x0, 14, 'Neurons fire (task starts)', { weight: 700, color: C.cyan });
+  g.line([[x0, yN], [x1, yN]], C.faint, 1.5);
+  g.line([[X(0), yN], [X(0) + 1, yN - 30], [X(0) + 6, yN - 30], [X(0) + 7, yN]], C.cyan, 3);
+  g.text(x0, yN + 28, 'fMRI signal (blood oxygen)', { weight: 700, color: C.amber });
+  const pts = [];
+  for (let s = 0; s <= Math.min(12, t); s += 0.05) pts.push([X(s), yB - Math.max(-0.2, hrf(s)) * hB]);
+  if (pts.length > 1) g.glowLine(pts, C.amber, 3.5);
+  g.line([[X(t), yN - 36], [X(t), yB + 4]], 'rgba(236,239,247,.7)', 1.5);
+  timeAxis(g, x0, x1, yB, 12, 2, 'seconds after the task starts');
+  if (t >= 5.2) g.pill(X(6.6), yB - hB * 0.98, ['Peak about', '5 seconds later'], { color: C.amber, to: [X(5), yB - hB], align: 'left' });
 }
 
-function resSVG() {
-  const bump = 'M345 290 C420 290 430 290 450 270 C480 236 500 236 525 262 C545 284 560 290 605 290';
-  return `<g data-scene="res">
-    ${panel(12, 12, 304, 356)}${panel(324, 12, 304, 356)}
-    ${T(32, 44, 'Spatial resolution', { size: 17, weight: 700 })}${T(32, 66, 'Where is the activity?', { color: C.soft })}
-    ${slice(88, 186, 0.48, `<circle cx="18" cy="-48" r="13" fill="${C.amber}"/>`)}
-    ${slice(240, 186, 0.48, `<circle cx="18" cy="-48" r="72" fill="url(#stb-blur)"/>`)}
-    ${T(88, 278, 'High:', { anchor: 'middle', weight: 700 })}${T(88, 298, 'a sharp spot', { anchor: 'middle', color: C.soft })}
-    ${T(240, 278, 'Low:', { anchor: 'middle', weight: 700 })}${T(240, 298, 'a blurry patch', { anchor: 'middle', color: C.soft })}
-    ${T(32, 336, ['Can it tell areas that are', 'close together apart?'], { color: C.soft })}
-    ${T(344, 44, 'Temporal resolution', { size: 17, weight: 700 })}${T(344, 66, 'When does it happen?', { color: C.soft })}
-    <line x1="345" y1="160" x2="605" y2="160" style="stroke:${C.soft}" stroke-width="1.5"/>
-    <line x1="400" y1="98" x2="400" y2="168" style="stroke:${C.soft}" stroke-width="1.5" stroke-dasharray="4 4"/>
-    ${T(400, 92, 'Event', { anchor: 'middle', color: C.soft })}
-    <path class="glow" d="M345 160 L398 160 L403 112 L409 160 L605 160" fill="none" style="stroke:${C.amber}" stroke-width="3" stroke-linejoin="round" filter="url(#stb-glow)"/>
-    ${T(345, 190, 'High: precise timing', { weight: 700 })}
-    <line x1="345" y1="290" x2="605" y2="290" style="stroke:${C.soft}" stroke-width="1.5"/>
-    <line x1="400" y1="228" x2="400" y2="298" style="stroke:${C.soft}" stroke-width="1.5" stroke-dasharray="4 4"/>
-    ${T(400, 222, 'Event', { anchor: 'middle', color: C.soft })}
-    <path d="${bump}" fill="none" style="stroke:#9DB3E8" stroke-width="3"/>
-    ${T(345, 320, 'Low: slow and blurred', { weight: 700 })}
-    ${T(605, 352, 'time →', { anchor: 'end', color: C.soft })}
-  </g>`;
-}
-
-function fmriSVG() {
-  // Blood vessel zoom: cells travel along the tube.
-  const cells = Array.from({ length: 12 }, (_, i) => {
-    const rich = i % 3 !== 2;
-    return `<g class="stb-cell" data-i="${i}"><ellipse cx="0" cy="0" rx="10" ry="7" style="fill:${rich ? C.o2 : C.deox}"/></g>`;
-  }).join('');
-  const t2x = (t) => 320 + t * 24;
-  const bold = ptsToPath(Array.from({ length: 121 }, (_, i) => { const t = i / 10; return [t2x(t), 300 - hrf(t) * 120]; }));
-  const ticks = [0, 2, 4, 6, 8, 10, 12].map((t) => `<line x1="${t2x(t)}" y1="318" x2="${t2x(t)}" y2="324" style="stroke:${C.soft}" stroke-width="1.5"/>${T(t2x(t), 342, String(t), { anchor: 'middle', color: C.soft })}`).join('');
-  return `<g data-scene="fmri">
-    ${slice(140, 196, 1, `<circle class="stb-blob" cx="22" cy="92" r="40" fill="url(#stb-heat)"/>`)}
-    ${T(140, 30, '↑ Front', { anchor: 'middle', color: C.soft })}
-    <g class="stb-f1">
-      <line x1="170" y1="270" x2="330" y2="110" style="stroke:${C.soft}" stroke-width="1.2" stroke-dasharray="4 5"/>
-      <line x1="176" y1="300" x2="330" y2="270" style="stroke:${C.soft}" stroke-width="1.2" stroke-dasharray="4 5"/>
-      ${panel(330, 60, 296, 308)}
-      <g transform="translate(0 0)">
-        ${[[400, 120], [460, 108], [520, 122], [575, 112]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="13" style="fill:${C.node};stroke:${C.amber}" stroke-width="2.5"/><circle class="glow" cx="${x}" cy="${y}" r="5" fill="${C.amber}" filter="url(#stb-glow)"/>`).join('')}
-      </g>
-      <rect x="340" y="172" width="276" height="56" rx="28" style="fill:#3A1F33;stroke:#B65A78" stroke-width="2"/>
-      <g clip-path="url(#stb-vessel-clip)">${cells}</g>
-      ${pill(478, 82, 'Active neurons use more oxygen', { color: C.amber })}
-      ${pill(478, 258, 'Oxygen-rich blood flows in', { color: C.o2, to: [440, 214] })}
-      <ellipse cx="358" cy="300" rx="9" ry="6" style="fill:${C.o2}"/>${T(374, 305, 'oxygen-rich', { color: C.soft })}
-      <ellipse cx="490" cy="300" rx="9" ry="6" style="fill:${C.deox}"/>${T(506, 305, 'oxygen-poor', { color: C.soft })}
-      ${T(478, 336, ['fMRI detects this change', 'in blood oxygen'], { anchor: 'middle', weight: 700 })}
-    </g>
-    <g class="stb-f2">
-      ${T(320, 70, 'Neurons fire', { weight: 700, color: C.cyan })}
-      <line x1="320" y1="120" x2="610" y2="120" style="stroke:${C.faint}" stroke-width="1.5"/>
-      <path d="M320 120 L321 88 L327 88 L328 120" fill="none" style="stroke:${C.cyan}" stroke-width="3"/>
-      ${T(320, 160, 'fMRI signal (blood oxygen)', { weight: 700, color: C.amber })}
-      <line x1="320" y1="300" x2="610" y2="300" style="stroke:${C.faint}" stroke-width="1.5"/>
-      <g clip-path="url(#stb-sweep-clip)"><path class="glow" d="${bold}" fill="none" style="stroke:${C.amber}" stroke-width="3.5" filter="url(#stb-glow)"/></g>
-      <line class="stb-cursor" x1="320" y1="62" x2="320" y2="306" style="stroke:${C.ink}" stroke-width="1.5" opacity=".7"/>
-      ${ticks}${T(612, 366, 'seconds after the task starts', { anchor: 'end', color: C.soft })}
-      ${pill(410, 214, ['Rises a few', 'seconds later'], { cls: 'stb-late', to: [t2x(3), 300 - hrf(3) * 120], color: C.amber, lead: C.amber })}
-      ${pill(140, 356, 'Shows where to about 1–2 mm', { color: C.ink })}
-    </g>
-  </g>`;
-}
-
-function eegSVG() {
-  const el = [[0, -92], [-26, -86], [26, -86], [-50, -52], [0, -52], [50, -52], [-84, -46], [84, -46], [-64, 0], [0, 0], [64, 0], [-98, 0], [98, 0],
-    [-50, 52], [0, 52], [50, 52], [-84, 46], [84, 46], [-26, 86], [26, 86]];
-  const head = `<g transform="translate(140 206)">
-    <ellipse cx="-112" cy="0" rx="10" ry="24" style="fill:#22325A;stroke:${C.soft}" stroke-width="2"/>
-    <ellipse cx="112" cy="0" rx="10" ry="24" style="fill:#22325A;stroke:${C.soft}" stroke-width="2"/>
-    <path d="M-14 -104 L0 -124 L14 -104" style="fill:#22325A;stroke:${C.soft}" stroke-width="2"/>
-    <circle cx="0" cy="0" r="108" style="fill:#22325A;stroke:${C.soft}" stroke-width="2.5"/>
-    <circle cx="0" cy="0" r="100" fill="none" style="stroke:#3F5078" stroke-width="1.5" stroke-dasharray="3 5"/>
-    ${el.map(([x, y]) => `<circle cx="${x}" cy="${y}" r="7" style="fill:${C.cyan};stroke:#0D1424" stroke-width="2"/>`).join('')}
-  </g>`;
-  return `<g data-scene="eeg">
-    ${T(140, 72, '↑ Front (nose)', { anchor: 'middle', color: C.soft })}
-    ${head}
-    ${pill(140, 350, 'Electrodes on the scalp', { to: [140, 258], color: C.cyan, lead: C.cyan })}
-    ${panel(272, 28, 356, 340)}
-    ${T(290, 60, '', { size: 17, weight: 700, cls: 'stb-eeg-title' })}
-    ${T(290, 84, '', { color: C.soft, cls: 'stb-eeg-desc' })}
-    <line x1="290" y1="216" x2="612" y2="216" style="stroke:${C.faint}" stroke-width="1" stroke-dasharray="2 6"/>
-    <g clip-path="url(#stb-eeg-clip)"><path class="stb-eeg-trace" d="" fill="none" style="stroke:${C.cyan}" stroke-width="2" stroke-linejoin="round"/></g>
-    <line x1="290" y1="322" x2="451" y2="322" style="stroke:${C.ink}" stroke-width="3"/>
-    ${T(370, 344, '1 second', { anchor: 'middle', color: C.soft })}
-    ${T(612, 344, 'Illustrative', { anchor: 'end', color: C.soft })}
-  </g>`;
-}
-
-function compareSVG() {
-  const t2x = (t) => 130 + t * 48.5;
-  const r = mulberry32(42);
-  let n = 0;
-  const eeg = [];
-  for (let t = 0; t <= 10; t += 0.01) {
+function drawCompare(g, t) {
+  const x0 = 14, x1 = g.w - 16, X = (s) => x0 + (s / 10) * (x1 - x0);
+  const yE = 100, top = yE + 74, yB = g.h - 62, hB = Math.max(50, yB - top);
+  g.line([[X(1), 28], [X(1), yB + 4]], C.ink, 1.5, [5, 5]);
+  g.text(X(1) + 6, 14, 'Picture shown', { weight: 700 });
+  g.text(x0, 46, 'EEG', { weight: 700, color: C.cyan, size: 17 });
+  g.text(x0, yE + 48, 'fMRI', { weight: 700, color: C.amber, size: 17 });
+  g.line([[x0, yE], [x1, yE]], C.faint, 1);
+  const r = mulberry32(42); let n = 0; const eeg = [];
+  for (let s = 0; s <= Math.min(10, t); s += 0.01) {
     n = 0.7 * n + (r() - 0.5) * 2;
-    const v = 5 * n + 34 * Math.exp(-(((t - 1.33) / 0.07) ** 2)) - 14 * Math.exp(-(((t - 1.12) / 0.03) ** 2));
-    eeg.push([t2x(t), 130 - v]);
+    // visual evoked response: small dip at ~75 ms, main positive peak (P100) at ~100 ms after the picture
+    eeg.push([X(s), yE - (4 * n + 30 * Math.exp(-(((s - 1.1) / 0.025) ** 2)) - 11 * Math.exp(-(((s - 1.075) / 0.015) ** 2)) - 8 * Math.exp(-(((s - 1.17) / 0.03) ** 2))) * 0.9]);
   }
+  if (eeg.length > 1) g.line(eeg, C.cyan, 2);
+  g.line([[x0, yB], [x1, yB]], C.faint, 1);
   const bold = [];
-  for (let t = 0; t <= 10; t += 0.05) bold.push([t2x(t), 300 - hrf(t - 1) * 95]);
-  const ticks = Array.from({ length: 11 }, (_, t) => `<line x1="${t2x(t)}" y1="318" x2="${t2x(t)}" y2="324" style="stroke:${C.soft}" stroke-width="1.5"/>${T(t2x(t), 342, String(t), { anchor: 'middle', color: C.soft, size: 14 })}`).join('');
-  return `<g data-scene="compare">
-    ${T(20, 136, 'EEG', { size: 18, weight: 700, color: C.cyan })}
-    ${T(20, 276, 'fMRI', { size: 18, weight: 700, color: C.amber })}
-    <line x1="130" y1="130" x2="615" y2="130" style="stroke:${C.faint}" stroke-width="1"/>
-    <line x1="130" y1="300" x2="615" y2="300" style="stroke:${C.faint}" stroke-width="1"/>
-    <line x1="${t2x(1)}" y1="44" x2="${t2x(1)}" y2="312" style="stroke:${C.ink}" stroke-width="1.5" stroke-dasharray="5 5"/>
-    ${T(t2x(1), 36, 'Picture shown', { anchor: 'middle', weight: 700 })}
-    <g clip-path="url(#stb-cmp-clip)">
-      <path d="${ptsToPath(eeg)}" fill="none" style="stroke:${C.cyan}" stroke-width="2"/>
-      <path class="glow" d="${ptsToPath(bold)}" fill="none" style="stroke:${C.amber}" stroke-width="3.5" filter="url(#stb-glow)"/>
-    </g>
-    <line class="stb-cursor" x1="130" y1="44" x2="130" y2="312" style="stroke:${C.ink}" stroke-width="1.5" opacity=".7"/>
-    ${ticks}${T(615, 366, 'seconds', { anchor: 'end', color: C.soft })}
-    ${pill(330, 70, 'EEG changes within milliseconds', { cls: 'stb-c1', to: [t2x(1.33), 98], color: C.cyan, lead: C.cyan })}
-    ${pill(525, 166, ['fMRI signal rises', 'seconds later'], { cls: 'stb-c2', to: [t2x(4), 300 - hrf(3) * 95], color: C.amber, lead: C.amber })}
-  </g>`;
+  for (let s = 0; s <= Math.min(10, t); s += 0.05) bold.push([X(s), yB - Math.max(-0.2, hrf(s - 1)) * hB]);
+  if (bold.length > 1) g.glowLine(bold, C.amber, 3.5);
+  g.line([[X(t), 28], [X(t), yB + 4]], 'rgba(236,239,247,.7)', 1.5);
+  timeAxis(g, x0, x1, yB, 10, 1, 'seconds');
+  if (t >= 1.3) g.pill(X(3), 48, 'Within a fraction of a second', { color: C.cyan, to: [X(1.1), yE - 26], align: 'left' });
+  if (t >= 4.4) g.pill(X(6.8), top + 16, ['Rises seconds', 'later'], { color: C.amber, to: [X(5.6), yB - hB * 0.92], align: 'left' });
 }
 
-function erpSVG() {
-  const ticks = [-100, 0, 100, 200, 300, 400, 500].map((t) => `<line x1="${ex(t)}" y1="345" x2="${ex(t)}" y2="351" style="stroke:${C.soft}" stroke-width="1.5"/>${T(ex(t), 368, String(t), { anchor: 'middle', color: C.soft, size: 14 })}`).join('');
-  const trialCols = ['#7FA0D8', '#8FD0C0', '#B9A0E0'];
-  return `<g data-scene="erp">
-    ${panel(12, 10, 616, 112, 'stb-pa')}
-    ${T(26, 36, '3 single trials (very noisy)', { weight: 700, cls: 'stb-pa' })}
-    ${T(614, 36, 'Simulation: made-up signal + noise', { anchor: 'end', color: C.soft })}
-    <g clip-path="url(#stb-pa-clip)" class="stb-pa">
-      ${[0, 1, 2].map((k) => `<path d="${erpD(ERP_TRIALS[k], 82, 3)}" fill="none" style="stroke:${trialCols[k]}" stroke-width="1.5" opacity=".85"/>`).join('')}
-    </g>
-    ${panel(12, 130, 616, 218)}
-    ${T(26, 156, '', { weight: 700, size: 17, cls: 'stb-n-label', color: C.amber })}
-    ${T(26, 178, 'Voltage: positive ↑', { color: C.soft })}
-    <rect class="stb-early" x="${ex(0)}" y="134" width="${ex(100) - ex(0)}" height="210" style="fill:rgba(115,211,255,.1)"/>
-    <line x1="${ex(-100)}" y1="262" x2="${ex(500)}" y2="262" style="stroke:${C.faint}" stroke-width="1"/>
-    <line x1="${ex(0)}" y1="14" x2="${ex(0)}" y2="345" style="stroke:${C.ink}" stroke-width="1.5" stroke-dasharray="5 5" opacity=".75"/>
-    <g clip-path="url(#stb-pb-clip)"><path class="stb-avg glow" d="" fill="none" style="stroke:${C.amber}" stroke-width="3" stroke-linejoin="round" filter="url(#stb-glow)"/></g>
-    ${ticks}${T(26, 368, 'Time (ms)', { color: C.soft, size: 14 })}
-    ${pill(ex(50), 200, ['Early peaks:', 'sensory'], { cls: 'stb-comp', color: C.cyan })}
-    ${pill(ex(430), 182, ['P300: later,', 'cognitive'], { cls: 'stb-comp', to: [ex(320), 262 - 6 * 8.5], color: C.amber, lead: C.amber })}
-    ${pill(ex(300), 322, 'Timing to the millisecond', { cls: 'stb-ev', color: C.ink })}
-    ${pill(ex(200), 112, 'Needs many trials and careful noise removal', { cls: 'stb-ev', color: C.ink })}
-  </g>`;
+function drawResolution(g) {
+  const x0 = 14, x1 = g.w - 16;
+  const ev = x0 + (x1 - x0) * 0.22;
+  const y1 = g.h * 0.36, y2 = g.h - 70;
+  g.text(x0, 16, 'When does it happen?', { weight: 700, size: 17 });
+  for (const [y, sharp] of [[y1, true], [y2, false]]) {
+    g.line([[x0, y], [x1, y]], C.soft, 1.5);
+    g.line([[ev, y - 70], [ev, y + 6]], C.soft, 1.5, [4, 4]);
+    g.text(ev, y - 82, 'Event', { align: 'center', color: C.soft });
+    const pts = [];
+    for (let x = x0; x <= x1; x += 1.5) {
+      const s = (x - ev) / (x1 - x0);
+      const v = sharp ? Math.exp(-(((s - 0.012) / 0.008) ** 2)) : Math.exp(-(((s - 0.3) / 0.14) ** 2));
+      pts.push([x, y - v * 58]);
+    }
+    if (sharp) g.glowLine(pts, C.amber, 3); else g.line(pts, '#9DB3E8', 3);
+    g.text(x0, y + 26, sharp ? 'High: precise timing' : 'Low: slow and blurred', { weight: 700 });
+  }
+  g.text(x1, g.h - 20, 'time →', { align: 'right', color: C.soft });
 }
 
-function pmSVG() {
-  const broca = `<circle class="stb-broca" cx="84" cy="126" r="20" fill="url(#stb-hatch)" style="stroke:${C.red}" stroke-width="3"/>`;
-  const hippo = `<path class="stb-hippo glow" d="M106 164 C124 168 150 167 168 162 C180 158 190 150 196 140" fill="none" style="stroke:${C.amber}" stroke-width="9" stroke-linecap="round" filter="url(#stb-glow)"/>`;
-  const bubble = `<path d="M40 76 h104 a14 14 0 0 1 14 14 v28 a14 14 0 0 1 -14 14 h-74 l-16 14 v-14 h-14 a14 14 0 0 1 -14 -14 v-28 a14 14 0 0 1 14 -14 z" style="fill:#22325A;stroke:${C.soft}" stroke-width="2"/>${T(92, 110, '“tan”', { anchor: 'middle', size: 20, weight: 700 })}`;
-  return `<g data-scene="pm">
-    <g class="stb-pm8">
-      ${panel(12, 14, 272, 164)}
-      ${T(30, 46, '1. In life', { size: 17, weight: 700 })}
-      ${bubble}
-      ${T(174, 98, ['Understood', 'speech, but', 'could only say', 'one word'], { color: C.soft, lh: 1.25 })}
-      ${panel(12, 192, 272, 172)}
-      ${T(30, 224, '2. After death', { size: 17, weight: 700 })}
-      ${T(30, 252, ['Broca examined his brain', 'and found damage in the', 'left frontal lobe.'], { lh: 1.35 })}
-      <path d="M284 300 C330 300 350 230 392 208" fill="none" style="stroke:${C.red}" stroke-width="2" stroke-dasharray="5 5"/>
-      ${pill(330, 318, '3. Link the two', { color: C.red, border: C.red })}
-    </g>
-    <g class="stb-pm9">
-      ${panel(12, 14, 272, 164)}
-      ${T(30, 46, 'Strength', { size: 17, weight: 700, color: C.mint })}
-      ${T(30, 74, ['A more detailed look at', 'deep structures, like the', 'hippocampus, than scans', 'can give.'], { lh: 1.35 })}
-      ${panel(12, 192, 272, 172)}
-      ${T(30, 224, 'Weaknesses', { size: 17, weight: 700, color: C.red })}
-      ${T(30, 252, ['Causation: the damage may', 'have another cause.'], { lh: 1.35 })}
-      ${T(30, 306, ['Consent: the person may not', 'have been able to agree.'], { lh: 1.35 })}
-    </g>
-    ${brainLat(318, 66, 1.02, broca + hippo)}
-    ${pill(470, 40, 'Damage: left frontal lobe', { cls: 'stb-pm8l', to: [404, 194], color: C.red, lead: C.red, border: C.red })}
-    ${pill(470, 40, 'Deep structure: hippocampus', { cls: 'stb-pm9l', to: [471, 236], color: C.amber, lead: C.amber })}
-    ${T(470, 354, 'Left side of the brain (front on the left)', { anchor: 'middle', color: C.soft })}
-  </g>`;
+const METHODS = {
+  fmri: { label: 'fMRI', color: C.amber, x: 0.18, y: 0.18, detail: ['Good spatial: about 1–2 mm', 'Poor temporal: about 5 s lag'] },
+  eeg: { label: 'EEG', color: C.cyan, x: 0.76, y: 0.82, detail: ['Excellent temporal: milliseconds', 'Poor spatial'] },
+  erp: { label: 'ERP', color: C.mint, x: 0.76, y: 0.82, detail: ['Same resolution as EEG,', 'for one type of stimulus'] },
+};
+function drawMethods(g, sel) {
+  const L = 52, R = 16, T = 20, B = Math.min(150, g.h * 0.36);
+  const x0 = L, x1 = g.w - R, y0 = g.h - B, y1 = T;
+  const X = (f) => x0 + f * (x1 - x0), Y = (f) => y0 - (1 - f) * (y0 - y1) + 0 * f;
+  g.line([[x0, y0], [x1, y0]], C.soft, 2); g.line([[x0, y0], [x0, y1]], C.soft, 2);
+  g.text((x0 + x1) / 2, y0 + 22, 'Temporal resolution: when →', { align: 'center', weight: 700 });
+  g.text(x0 + 4, y0 + 46, 'Poor (seconds)', { color: C.soft }); g.text(x1, y0 + 46, 'Excellent (ms)', { align: 'right', color: C.soft });
+  g.text(18, (y0 + y1) / 2, 'Spatial resolution: where →', { align: 'center', weight: 700, rotate: -Math.PI / 2 });
+  g.text(x0 + 6, y1 + 6, 'Good (mm)', { color: C.soft }); g.text(x0 + 6, y0 - 14, 'Poor', { color: C.soft });
+  for (const [k, m] of Object.entries(METHODS)) {
+    const on = sel === 'all' || sel === k;
+    g.ctx.globalAlpha = on ? 1 : 0.25;
+    const px = X(m.x), py = Y(m.y) + (k === 'erp' ? 0 : 0);
+    g.dot(px + (k === 'erp' ? 16 : k === 'eeg' ? -16 : 0), py, 12, m.color, true);
+    g.text(px + (k === 'erp' ? 34 : k === 'eeg' ? -34 : 22), py - (k === 'fmri' ? 0 : 26), m.label, { weight: 700, size: 17, color: m.color, align: k === 'eeg' ? 'right' : 'left' });
+    g.ctx.globalAlpha = 1;
+  }
+  if (METHODS[sel]) {
+    const m = METHODS[sel];
+    g.pill((x0 + x1) / 2, (y0 + y1) / 2, m.detail, { color: m.color, border: m.color });
+  }
+  // post-mortem: not on the chart
+  const on = sel === 'all' || sel === 'pm';
+  g.ctx.globalAlpha = on ? 1 : 0.3;
+  const by = y0 + 66;
+  g.ctx.strokeStyle = C.violet; g.ctx.lineWidth = 1.5; g.ctx.setLineDash([6, 5]);
+  g.round(x0 - 30, by, x1 - x0 + 30, Math.max(56, g.h - by - 6), 12); g.ctx.stroke(); g.ctx.setLineDash([]);
+  g.text(x0 - 18, by + 20, 'Post-mortem (not on this chart)', { weight: 700, color: C.violet });
+  g.text(x0 - 18, by + 42, 'Fine detail of structure, but no activity.', { color: C.ink });
+  g.ctx.globalAlpha = 1;
 }
 
-function chartSVG() {
-  const pt = (id, x, y, color, label, lx, ly, anchor) => `<g class="stb-pt" data-m="${id}">
-      <circle class="glow" cx="${x}" cy="${y}" r="13" fill="${color}" filter="url(#stb-glow)"/>
-      ${T(lx, ly, label, { size: 17, weight: 700, color, anchor })}
-    </g>`;
-  return `<g data-scene="chart">
-    <line x1="110" y1="255" x2="612" y2="255" style="stroke:${C.soft}" stroke-width="2" marker-end="url(#stb-arrow)"/>
-    <line x1="110" y1="255" x2="110" y2="30" style="stroke:${C.soft}" stroke-width="2" marker-end="url(#stb-arrow)"/>
-    ${T(362, 300, 'Temporal resolution: when →', { anchor: 'middle', weight: 700 })}
-    ${T(118, 276, 'Poor (seconds)', { color: C.soft })}${T(612, 276, 'Excellent (milliseconds)', { anchor: 'end', color: C.soft })}
-    ${T(18, 142, 'Spatial resolution: where →', { anchor: 'middle', weight: 700, extra: 'transform="rotate(-90 18 142)"' })}
-    ${T(100, 44, ['Good', '(mm)'], { anchor: 'end', color: C.soft })}${T(100, 250, 'Poor', { anchor: 'end', color: C.soft })}
-    ${pt('fmri', 200, 76, C.amber, 'fMRI', 222, 82, 'start')}
-    ${pt('eeg', 540, 226, C.cyan, 'EEG', 518, 202, 'end')}
-    ${pt('erp', 540, 226, C.mint, 'ERP', 562, 202, 'start')}
-    <g class="stb-pt" data-m="pm">
-      <rect x="110" y="312" width="505" height="60" rx="12" style="fill:${C.panel};stroke:${C.violet}" stroke-width="1.5" stroke-dasharray="6 5"/>
-      ${T(126, 336, 'Post-mortem (not on this chart)', { weight: 700, color: C.violet })}
-      ${T(126, 358, 'Very fine detail of structure, but no activity at all.', { color: C.ink })}
-    </g>
-    ${pill(404, 104, ['Good spatial: about 1–2 mm', 'Poor temporal: about 5 s lag'], { cls: 'stb-det', extra: 'data-m="fmri"', color: C.amber, border: C.amber })}
-    ${pill(410, 150, ['Excellent temporal: milliseconds', 'Poor spatial'], { cls: 'stb-det', extra: 'data-m="eeg"', color: C.cyan, border: C.cyan })}
-    ${pill(440, 150, ['Same resolution as EEG,', 'for one type of stimulus'], { cls: 'stb-det', extra: 'data-m="erp"', color: C.mint, border: C.mint })}
-  </g>`;
+function drawErp(g, arr, n, step) {
+  const L = 16, R = 16;
+  const X = (t) => L + ((t + 100) / 600) * (g.w - L - R);
+  const topH = step === 5 ? Math.min(130, g.h * 0.26) : 0;
+  if (step === 5) {
+    g.text(L, 12, '3 single trials (very noisy)', { weight: 700 });
+    const yc = 26 + (topH - 26) / 2;
+    ['#7FA0D8', '#8FD0C0', '#B9A0E0'].forEach((c, k) => g.line(ERP_T.map((t, i) => [X(t), yc - ERP_TRIALS[k][i] * (topH / 60)]), c, 1.3));
+  }
+  const y0 = topH + 34, y1 = g.h - 56;
+  const base = y0 + (y1 - y0) * 0.68, sc = (base - y0 - 10) / 8;
+  const tw = g.text(L, y0 - 12, `Average of ${n} ${n === 1 ? 'trial' : 'trials'}`, { weight: 700, size: 17, color: C.amber });
+  if (tw + g.measure('Voltage: positive ↑') + 40 < g.w) g.text(g.w - R, y0 - 12, 'Voltage: positive ↑', { align: 'right', color: C.soft });
+  if (step === 6 && n >= 20) { g.ctx.fillStyle = 'rgba(115,211,255,.12)'; g.ctx.fillRect(X(0), y0, X(100) - X(0), y1 - y0); }
+  g.line([[X(-100), base], [X(500), base]], C.faint, 1);
+  g.line([[X(0), y0], [X(0), y1]], C.ink, 1.5, [5, 5]);
+  g.ctx.save(); g.ctx.beginPath(); g.ctx.rect(L, y0, g.w - L - R, y1 - y0); g.ctx.clip();
+  g.glowLine(ERP_T.map((t, i) => [X(t), base - arr[i] * sc]), C.amber, 3);
+  g.ctx.restore();
+  for (const t of [-100, 0, 100, 200, 300, 400, 500]) { g.line([[X(t), y1], [X(t), y1 + 6]], C.soft, 1.5); g.text(X(t), y1 + 18, String(t), { align: 'center', color: C.soft }); }
+  g.text(X(0), y1 + 42, '↑ Stimulus', { align: 'center', color: C.soft });
+  g.text(g.w - R, y1 + 42, 'Time (ms)', { align: 'right', color: C.soft });
+  if (step === 6 && n >= 20) {
+    g.pill(X(50), y0 + 26, ['Early peaks:', 'sensory'], { color: C.cyan });
+    g.pill(X(400), y0 + 30, ['P300: later,', 'cognitive'], { color: C.amber, to: [X(320), base - 6 * sc] });
+  }
+  if (step === 7) {
+    g.pill(X(200), y0 + 24, ['Needs many trials and', 'careful noise removal'], { color: C.ink });
+    g.pill(X(300), base + 40, 'Timing to the millisecond', { color: C.ink });
+  }
 }
 
-const CSS = `
-.stb { position:absolute; inset:0; display:flex; flex-direction:column; }
-.lesson-visual .stb .vis-controls { position:static; padding:12px 12px 0; margin:0; min-height:56px; align-items:center; }
-.stb .stb-svg { flex:1 1 0; min-height:0; width:100%; height:100%; }
-.lesson-visual .stb .vis-caption { position:static; margin:0; padding:4px 16px 14px; max-width:none; min-height:2.9em; }
-.stb .stb-ctl-label { font-weight:700; color:var(--stage-ink); margin-right:2px; }
-.stb [data-scene] { animation: stb-in .5s ease both; }
-@keyframes stb-in { from { opacity:0; } }
-.stb .stb-pill { transition: opacity .5s ease; }
-.stb .off { opacity:0 !important; pointer-events:none; }
-.stb .stb-blob { transition: opacity .3s linear; }
-.stb .stb-pt, .stb .stb-pa, .stb .stb-early { transition: opacity .5s ease; }
-.stb .stb-pt.dim { opacity:.22; }
-:root[data-calm="true"] .stb .glow { filter:none; }
-@media (prefers-reduced-motion: reduce) { :root:not([data-motion="full"]) .stb * { transition:none !important; animation:none !important; } }
-`;
-
-const SVG = `<svg class="diagram stb-svg" viewBox="0 0 640 380" role="img" aria-label="">
-  <defs>
-    <filter id="stb-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <radialGradient id="stb-heat"><stop offset="0" stop-color="#FFE9A0"/><stop offset=".35" stop-color="#FFB347" stop-opacity=".95"/><stop offset=".7" stop-color="#FF6B4A" stop-opacity=".55"/><stop offset="1" stop-color="#FF6B4A" stop-opacity="0"/></radialGradient>
-    <radialGradient id="stb-blur"><stop offset="0" stop-color="#FFC965" stop-opacity=".8"/><stop offset=".5" stop-color="#FFC965" stop-opacity=".35"/><stop offset="1" stop-color="#FFC965" stop-opacity="0"/></radialGradient>
-    <pattern id="stb-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="rgba(255,138,122,.15)"/><line x1="0" y1="0" x2="0" y2="8" stroke="rgba(255,138,122,.7)" stroke-width="2"/></pattern>
-    <marker id="stb-arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="${C.soft}"/></marker>
-    <clipPath id="stb-vessel-clip"><rect x="342" y="174" width="272" height="52" rx="26"/></clipPath>
-    <clipPath id="stb-sweep-clip"><rect class="stb-sweep" x="310" y="40" width="0" height="300"/></clipPath>
-    <clipPath id="stb-cmp-clip"><rect class="stb-sweep2" x="125" y="40" width="0" height="280"/></clipPath>
-    <clipPath id="stb-eeg-clip"><rect x="286" y="96" width="332" height="216"/></clipPath>
-    <clipPath id="stb-pa-clip"><rect x="130" y="44" width="496" height="76"/></clipPath>
-    <clipPath id="stb-pb-clip"><rect x="130" y="134" width="496" height="210"/></clipPath>
-  </defs>
-  ${methodsSVG()}${resSVG()}${fmriSVG()}${eegSVG()}${compareSVG()}${erpSVG()}${pmSVG()}${chartSVG()}
-</svg>`;
-
+/* ------------------------------------------------------------------ captions [visible, screen-reader] */
 const CAPTIONS = [
-  ['Spatial resolution = where. Temporal resolution = when.', 'Left: two brain slices, one with a sharp small spot (high spatial resolution), one with a blurry patch (low). Right: two timelines, one with a sharp response right at the event (high temporal resolution), one slow and delayed (low).'],
-  ['Active neurons need more oxygen, so oxygen-rich blood flows to them. fMRI detects this.', 'A brain slice with an active area at the back, and a zoomed-in blood vessel where oxygen-rich blood cells flow towards active neurons.'],
-  ['Press “Start the task”. The blood signal rises a few seconds after the neurons fire.', 'Graph: neurons fire at 0 seconds, but the fMRI blood oxygen signal rises slowly and peaks several seconds later. The active area on the brain slice brightens at the same slow pace.'],
-  ['Press a button to see a brainwave pattern. Patterns are illustrative.', 'A head seen from above covered in electrodes, and an EEG trace showing the selected brainwave pattern.'],
-  ['Press “Show a picture”. EEG reacts at once; the fMRI signal comes seconds later.', 'Two traces on the same time axis. When a picture is shown, the EEG changes within a fraction of a second, but the fMRI signal only rises several seconds later.'],
-  ['Simulation. Average more trials and watch the random noise cancel out.', 'Top: three very noisy single EEG trials. Bottom: the average of the chosen number of trials. With more trials the noise cancels out and a clear ERP waveform appears.'],
+  ['Spatial resolution = where. Temporal resolution = when.', 'A real 3D brain seen from behind, with an active area on the visual cortex shown either as a sharp small spot (high spatial resolution) or a blurry patch (low). Beside it, two timelines: a sharp response right at the event (high temporal resolution) and a slow, delayed one (low).'],
+  ['Active areas need more oxygen, so oxygen-rich blood flows to them. fMRI detects this. The coloured patch is illustrative.', 'A real 3D brain. An illustrative fMRI activation patch glows on the cortex in the area used by the chosen task: the visual cortex at the back for looking at a picture, or the left motor area for tapping the right-hand fingers.'],
+  ['Press “Start the task”. The blood signal rises slowly and peaks about 5 seconds after the neurons fire.', 'A scanner-style slice cut through the real 3D brain, seen from above. Beside it, a graph: neurons fire at 0 seconds, but the fMRI blood oxygen signal rises slowly and peaks about 5 seconds later. The active patch on the slice brightens at the same slow pace.'],
+  ['Press a button to see a brainwave pattern. Patterns and colours are illustrative.', 'A head with EEG electrodes placed using the international 10–20 system. The scalp is coloured where the chosen brainwave is largest. Beside it, EEG traces from five electrodes show the chosen pattern.'],
+  ['Press “Show a picture”. EEG reacts at once; the fMRI signal comes seconds later. Traces are illustrative.', 'A see-through head with EEG electrodes and the brain inside. When a picture is shown, the electrodes at the back of the head react within a fraction of a second, but the fMRI patch on the visual cortex only rises several seconds later. A graph shows both on the same time axis.'],
+  ['Simulation. Average more trials and watch the random noise cancel out.', 'A head with the electrode Pz highlighted. Beside it, three very noisy single EEG trials and the average of the chosen number of trials. With more trials the noise cancels out and a clear ERP waveform appears.'],
   ['Early peaks are linked to sensory processing. The P300 is a later, cognitive peak.', 'The averaged ERP with the early peaks, in roughly the first 100 milliseconds, labelled sensory, and a large positive peak at about 300 milliseconds labelled P300, cognitive.'],
   ['ERPs give millisecond timing, but they need many trials and careful noise removal.', 'The averaged ERP with notes: timing to the millisecond, and needs many trials and careful noise removal.'],
-  ['Behaviour seen in life is linked to damage found after death.', 'Card 1: in life, Tan could only say one word. Card 2: after death, Broca found damage in the left frontal lobe, shown on a side view of the brain.'],
-  ['Post-mortems give fine detail, but causation and consent are problems.', 'A side view of the brain with the deep hippocampus highlighted. Cards list a strength (detail of deep structures) and weaknesses (causation and consent).'],
+  ['Behaviour seen in life is linked to damage found after death.', 'The left side of a real 3D brain. Broca’s area, on the left inferior frontal gyrus, is shown as damaged tissue. A card explains: in life, Tan could only say one word; after death, Broca found damage in the left frontal lobe.'],
+  ['A slice cut through the brain shows deep structures, such as the hippocampus. (3D model slice, coloured for clarity.)', 'A coronal slice cut through the real 3D brain, seen from the front, with the hippocampus highlighted on both sides. A slider moves the slice forwards and backwards.'],
   ['Press a method to see where it sits.', 'Chart: spatial resolution going up, temporal resolution going right. fMRI is high and to the left. EEG and ERP are low and to the right. Post-mortem is not on the chart: very fine detail of structure but no activity over time.'],
 ];
+const INTRO = ['Four ways of studying the brain. The coloured patch is illustrative.', 'A see-through head with EEG electrodes on the scalp and the brain inside, with an illustrative fMRI active area glowing on the visual cortex.'];
 
-/* ------------------------------------------------------------------ the lesson */
+/* ------------------------------------------------------------------ the visual */
+const VISUAL = {
+  dark: true,
+  async create(container) {
+    const S = createStage(container, 'stb3');
+    const viewer = new BrainViewer(S.gl, { label: '3D brain for this step' });
+    await viewer.ready;
+    quietPicking(viewer);
+    const freeRect = freeRectFor(S);
+    installViewShift(viewer, freeRect);
+    viewer.setReal(true);
+    const rm = () => reducedMotion();
+    const cam = viewer.camera;
+    viewer.model.updateMatrixWorld(true);
+    const W = (p) => toWorld(viewer, p);
+    const project = (p) => { const q = viewer.project(p); return q && { x: q.x + S.gl.offsetLeft, y: q.y + S.gl.offsetTop }; };
+    const labels = createLabels(S, project, freeRect);
+    const chips = createChips(S, project);
+    const panel = createPanel(S, 'side');
+    const facing = (pModel, n) => { const nv = new THREE.Vector3(...n).normalize(); return () => nv.dot(cam.position.clone().sub(W(pModel))) > 0; };
+    const brainC = viewer.center.clone(); // brain centre in model space
+
+    // ---- anchor points on the real cortex (model space)
+    const extreme = (mesh, axis, sign) => {
+      const o = viewer.meshes[mesh]; o.updateMatrix(); let best = null; const v = new THREE.Vector3(); const pos = o.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(o.matrix); if (!best || sign * v[axis] > sign * best[axis]) best = v.clone(); }
+      return best;
+    };
+    const P = {
+      v1L: regionCentre(viewer, 3, 'left'), v1R: regionCentre(viewer, 3, 'right'),
+      poleL: extreme('cortex_left_occipital', 'z', -1), poleR: extreme('cortex_right_occipital', 'z', -1),
+      hand: snapToRegion(viewer, fromRAS(-38, -24, 60), 1, 'left'),          // hand knob, left precentral gyrus
+      s1: snapToRegion(viewer, fromRAS(-40, -32, 56), 2, 'left'),
+      sma: snapToRegion(viewer, fromRAS(-4, -8, 64), 0, 'left'),             // supplementary motor area (medial)
+      broca: regionCentre(viewer, 5, 'left'),
+    };
+    const TASKS = {
+      see: {
+        label: 'Looking at a picture', area: 'Visual cortex', where: 'occipital lobe, at the back',
+        seeds: [{ p: P.v1L, sigma: 11, w: 0.85 }, { p: P.v1R, sigma: 11, w: 0.85 }, { p: P.poleL, sigma: 11, w: 0.9 }, { p: P.poleR, sigma: 11, w: 0.9 }],
+        view: [0.55, 0.35, -1], dist: 470, anchor: P.poleL, nrm: [0.3, 0.1, -1], cutY: P.v1L.y + 2, cutView: [0.05, 1, -0.35],
+      },
+      tap: {
+        label: 'Tapping right-hand fingers', area: 'Left motor area', where: 'frontal lobe (controls the right hand)',
+        seeds: [{ p: P.hand, sigma: 8, w: 1 }, { p: P.s1, sigma: 7, w: 0.5 }, { p: P.sma, sigma: 7, w: 0.6 }],
+        view: [1, 0.95, 0.05], dist: 430, anchor: P.hand, nrm: [0.5, 1, 0], cutY: P.hand.y - 6, cutView: [0.05, 1, 0.3],
+      },
+    };
+    let task = 'see';
+
+    // ---- effects
+    const bold = cortexLayer(viewer, { style: 'heat', thresh: 0.3, opacity: 0.95 });
+    const lesion = cortexLayer(viewer, { hemis: ['left'], lobes: ['frontal'], style: 'lesion', region: 5, regionAdd: 1, thresh: 0.5, colors: ['#2E0B09', '#7A2618'], opacity: 0.97 });
+    const slicer = createSlicer(viewer);
+    slicer.addLayer(bold); slicer.addLayer(lesion);
+    const rig = createEegRig(viewer);
+    // cut-face colours. Groups: 0 cortex, 1 cerebellum/brainstem, 2 hippocampus, 3 ventricles, 4 thalamus, 5 basal ganglia, 6 amygdala, 7 other
+    const MRI = (g) => ['#C7CBD3', '#B9BDC6', '#8F949E', '#1E232E', '#8F949E', '#8F949E', '#8F949E', '#AEB2BB'][g];   // like a T1 scan: white matter light, grey matter darker, fluid dark
+    const TISSUE = (g) => (g === 2 ? '#FFC23D' : null);
+    let hippoCut = { left: null, right: null };
+
+    // channel gains for the traces: how big each rhythm is at each traced electrode (from the same maps)
+    const gainsFor = (kind) => {
+      const spec = MAPS[kind];
+      const val = (name) => Object.entries(spec.sites).reduce((a, [k, w]) => a + w * Math.exp(-rig.result.electrodes[name].pos.distanceToSquared(rig.result.electrodes[k].pos) / (2 * spec.sigma ** 2)), 0);
+      const all = Object.keys(rig.result.electrodes).map(val); const mx = Math.max(...all);
+      return TRACE_CH.map((c) => 0.3 + 0.7 * val(c.name) / mx);
+    };
+
+    // ---- per-frame
+    let eegKind = 'alert', eegOn = false, tEeg = 3, gains = gainsFor('alert');
+    viewer.on('frame', (dt) => {
+      rig.update(dt);
+      if (eegOn) { if (!rm()) tEeg += dt; panel.redraw(); }
+      labels.update(); chips.update();
+    });
+
+    // ---- animation bookkeeping
+    const cancels = new Set();
+    const stopAll = () => { cancels.forEach((c) => c()); cancels.clear(); };
+    const run = (dur, fn, done) => {
+      if (rm()) { fn(1); done?.(); return; }
+      let raf = 0; const t0 = performance.now();
+      const fr = (now) => { const p = Math.min(1, (now - t0) / dur); fn(p); if (p < 1) raf = requestAnimationFrame(fr); else { cancels.delete(cancel); done?.(); } };
+      const cancel = () => cancelAnimationFrame(raf);
+      cancels.add(cancel); raf = requestAnimationFrame(fr);
+    };
+    const ctl = (defs, label) => setControls(S.ctrl, defs, label);
+    const cap = (t) => { S.cap.textContent = t; };
+    let instant = true;
+    let building = false, pendingFly = null;
+    // during a step change, wait until panels are placed so the subject is centred in the free space
+    const fly = (target, dir, dist) => { if (building) pendingFly = [target, dir, dist]; else flyTo(viewer, target, dir, dist, instant || rm()); };
+
+    const reset = () => {
+      stopAll();
+      eegOn = false;
+      labels.clear(); chips.set([]); panel.hide();
+      slicer.off(); slicer.setHeat([], 0);
+      bold.setVisible(false); lesion.setVisible(false);
+      rig.setVisible(false); rig.highlight({}); rig.setMap('none', true); rig.arcs.visible = false; rig.fids.visible = false;
+      viewer.setXray(false); viewer.setHideHemisphere(null);
+      S.root.dataset.layout = 'full';
+      ctl([]);
+    };
+
+    // ---- step builders
+    const showBold = (t, level = 1, sharpness = null) => {
+      const tk = TASKS[t];
+      let seeds = tk.seeds;
+      if (sharpness === 'sharp') seeds = [{ p: P.poleL, sigma: 4.5, w: 1 }];
+      if (sharpness === 'blurry') seeds = [{ p: P.poleL, sigma: 30, w: 1 }];
+      bold.setSeeds(seeds);
+      bold.uniforms.uSoft.value = sharpness === 'blurry' ? 1 : 0;
+      bold.uniforms.uThresh.value = sharpness === 'blurry' ? 0.05 : 0.3;
+      bold.level = level;
+      bold.setVisible(true);
+    };
+    const taskLabel = (t, extra = '') => {
+      const tk = TASKS[t];
+      labels.set([{ id: 'area', html: `${tk.area}<small>${tk.where}</small>${extra}`, color: C.amber, anchor: () => W(tk.anchor), facing: facing(tk.anchor, tk.nrm), dx: t === 'see' ? -170 : -190, dy: -120 }]);
+    };
+    const headScene = (opacity, dir = [1, 0.6, 1], dist = 700) => {
+      rig.setVisible(true); rig.setOpacity(opacity);
+      fly(rig.centre, dir, dist);
+    };
+    const electrodeChips = (names = Object.keys(rig.electrodes)) => {
+      const hl = Object.fromEntries(TRACE_CH.map((c) => [c.name, c.color]));
+      chips.set(names.map((n) => ({ text: n, color: hl[n], anchor: () => rig.worldPos(n), facing: () => rig.facing(n, cam) })));
+    };
+
+    const orientChips = (y, sides = false) => chips.set([
+      { text: 'Front', centre: true, anchor: () => W(new THREE.Vector3(brainC.x, y, brainC.z + 96)) },
+      { text: 'Back', centre: true, anchor: () => W(new THREE.Vector3(brainC.x, y, brainC.z - 100)) },
+      ...(sides ? [
+        { text: 'Left', centre: true, anchor: () => W(new THREE.Vector3(brainC.x + 80, y, brainC.z)) },     // +X = subject's left
+        { text: 'Right', centre: true, anchor: () => W(new THREE.Vector3(brainC.x - 80, y, brainC.z)) },
+      ] : []),
+    ]);
+    const updateHippoCut = (z) => {
+      for (const h of ['left', 'right']) {
+        const o = viewer.meshes[`hippocampus_${h}`]; o.updateMatrix();
+        const pos = o.geometry.attributes.position; const v = new THREE.Vector3(); const acc = new THREE.Vector3(); let n = 0;
+        for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(o.matrix); if (Math.abs(v.z - z) < 2.5) { acc.add(v); n++; } }
+        hippoCut[h] = n ? acc.divideScalar(n) : null;
+      }
+    };
+    const hippoBox = new THREE.Box3();
+    ['left', 'right'].forEach((h) => { const o = viewer.meshes[`hippocampus_${h}`]; o.updateMatrix(); o.geometry.computeBoundingBox(); hippoBox.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrix)); });
+    const hippoMid = hippoBox.getCenter(new THREE.Vector3());
+
+    const STEPS = {
+      [-1]: () => {
+        headScene(0.24, [0.8, 0.45, -1], 560);
+        showBold('see', 0.9);
+        labels.set([
+          { id: 'eeg', html: 'EEG electrodes<small>on the scalp</small>', color: C.cyan, anchor: () => rig.worldPos('C3'), facing: () => rig.facing('C3', cam), dx: 150, dy: -90 },
+          { id: 'fmri', html: 'Active area<small>as fMRI shows it</small>', color: C.amber, anchor: () => W(P.poleL), dx: -150, dy: 40 },
+        ]);
+        cap(INTRO[0]); return INTRO[1];
+      },
+      0: () => {
+        S.root.dataset.layout = 'side';
+        let mode = 'sharp';
+        const set = (m) => {
+          mode = m; pressOnly(S.ctrl, m); showBold('see', 1, m);
+          labels.set([{ id: 'sp', html: m === 'sharp' ? 'High spatial resolution<small>a sharp, small spot</small>' : 'Low spatial resolution<small>a blurry patch</small>', color: C.amber, anchor: () => W(P.poleL), dx: -150, dy: -130 }]);
+        };
+        ctl([{ label: 'Sharp spot', key: 'sharp', pressed: true, onClick: () => set('sharp') }, { label: 'Blurry patch', key: 'blurry', pressed: false, onClick: () => set('blurry') }], 'Where:');
+        set(mode);
+        fly(brainC, [0.75, 0.35, -1], 370);
+        panel.show({ cls: 'side', title: 'Temporal resolution', sub: 'How precisely it shows when activity happens', draw: drawResolution, aria: 'Two timelines. High temporal resolution: a sharp response right at the event. Low: a slow, blurred response after it.' });
+        cap(CAPTIONS[0][0]);
+      },
+      1: () => {
+        const set = (t) => {
+          task = t; pressOnly(S.ctrl, t); showBold(t, 1); taskLabel(t);
+          fly(brainC, TASKS[t].view, TASKS[t].dist);
+          orientChips(brainC.y + 30);
+          cap(`${TASKS[t].label}: the ${TASKS[t].area.toLowerCase()} becomes more active. The coloured patch is illustrative.`);
+        };
+        ctl(Object.entries(TASKS).map(([k, v]) => ({ label: v.label, key: k, pressed: k === task, onClick: () => set(k) })), 'Task:');
+        set(task);
+        panel.show({ cls: 'card right', title: 'What fMRI picks up', sub: '1. Neurons in an area work harder.<br>2. They use more oxygen.<br>3. More oxygen-rich blood flows in.<br>4. fMRI detects the change in blood oxygen (the BOLD signal).' });
+      },
+      2: () => {
+        S.root.dataset.layout = 'side';
+        const tk = TASKS[task];
+        let slice = true, t = 12;
+        const draw = (g) => drawFmriTime(g, t);
+        const setT = (s) => {
+          t = s;
+          // the map marks the area once the signal has risen (it stays marked after the peak)
+          const lvl = s >= 5 ? Math.max(0.55, hrf(s)) : Math.max(0, hrf(s));
+          bold.level = lvl; slicer.heatLevel = s >= 5 ? Math.max(0.55, lvl) : lvl;
+          panel.redraw();
+        };
+        const setSlice = (on) => {
+          slice = on; pressOnly(S.ctrl, on ? 'slice' : 'whole');
+          if (on) {
+            slicer.setPalette(MRI);
+            slicer.cut([0, -1, 0], new THREE.Vector3(0, tk.cutY, 0));
+            slicer.setHeat(tk.seeds.slice(0, 4), t >= 5 ? Math.max(0.55, hrf(t)) : Math.max(0, hrf(t)));
+            fly(brainC, tk.cutView, 450);
+            labels.set([
+              { id: 'area', html: `${tk.area}<small>fMRI can locate this to about 1–2 mm (patch is illustrative)</small>`, color: C.amber, anchor: () => W(new THREE.Vector3(tk.anchor.x, tk.cutY, tk.anchor.z)), dx: -150, dy: -110 },
+            ]);
+            orientChips(tk.cutY, true);
+          } else {
+            slicer.off(); orientChips(brainC.y + 30);
+            fly(brainC, tk.view, tk.dist); taskLabel(task);
+          }
+        };
+        showBold(task, 1);
+        setControls(S.ctrl, [
+          { label: '▶ Start the task', onClick: () => { stopAll(); setT(0); run(12000, (p) => setT(p * 12)); } },
+          { label: 'Slice', key: 'slice', pressed: true, onClick: () => setSlice(true) },
+          { label: 'Whole brain', key: 'whole', pressed: false, onClick: () => setSlice(false) },
+        ]);
+        panel.show({ cls: 'side', title: `fMRI timing: ${tk.label.toLowerCase()}`, sub: 'Model curve (typical response). Time shown in real seconds.', draw, aria: 'Graph: neurons fire at 0 seconds; the fMRI signal rises slowly and peaks about 5 seconds later.' });
+        setSlice(true);
+        setT(instant || rm() ? 12 : 0);
+        if (!instant && !rm()) run(12000, (p) => setT(p * 12));
+        cap(CAPTIONS[2][0]);
+      },
+      3: () => {
+        S.root.dataset.layout = 'side';
+        headScene(1, [0.3, 1, -0.6], 560);
+        rig.highlight(Object.fromEntries(TRACE_CH.map((c) => [c.name, c.color])));
+        electrodeChips();
+        eegOn = true;
+        let lines = false;
+        const setKind = (k) => {
+          eegKind = k; gains = gainsFor(k); pressOnly(S.ctrl, k); rig.setMap(k, instant || rm());
+          panel.show({ cls: 'side', title: EEG_KINDS[k].title, sub: EEG_KINDS[k].desc, draw: (g) => drawTraces(g, eegKind, tEeg, gains), aria: `EEG traces from electrodes Fz, Cz, Pz, O1 and O2 showing ${EEG_KINDS[k].title}. Illustrative.` });
+          cap(`${EEG_KINDS[k].title}. Colour on the scalp: where these waves are biggest. Illustrative.`);
+        };
+        const setLines = () => {
+          lines = !lines;
+          rig.arcs.visible = lines; rig.fids.visible = lines;
+          S.ctrl.querySelector('[data-key="lines"]').setAttribute('aria-pressed', String(lines));
+          const f = rig.result.fiducials;
+          labels.set(lines ? [
+            { id: 'nas', html: 'Nasion<small>top of the nose</small>', color: C.amber, anchor: () => W(f.nasion), dx: -60, dy: 120 },
+            { id: 'ini', html: 'Inion<small>bump at the back of the skull</small>', color: C.amber, anchor: () => W(f.inion), dx: 70, dy: 120 },
+            { id: 'lpa', html: 'Ear point', color: C.amber, anchor: () => W(f.lpa), dx: 10, dy: 130 },
+          ] : []);
+          flyTo(viewer, rig.centre, lines ? [1, 0.3, 0.02] : [0.3, 1, -0.6], lines ? 680 : 560, rm());
+          if (lines) cap('The 10–20 system: distances from the nasion to the inion, and ear to ear, are split into 10% and 20% steps. Positions on this model are approximate.');
+          else setKind(eegKind);
+        };
+        ctl([...Object.entries(EEG_KINDS).map(([k, v]) => ({ label: v.label, key: k, pressed: k === eegKind, onClick: () => setKind(k) })),
+          { label: '10–20 lines', key: 'lines', pressed: false, onClick: setLines }]);
+        setKind(eegKind);
+      },
+      4: () => {
+        S.root.dataset.layout = 'side';
+        headScene(0.2, [0.85, 0.5, -1], 540);
+        showBold('see', 0);
+        rig.setMap('vep', true); rig.setMapGain(0);
+        let t = 10;
+        const labE = { id: 'e', html: 'EEG: within a fraction of a second', color: C.cyan, anchor: () => rig.worldPos('Oz'), dx: 130, dy: -120, show: false };
+        const labF = { id: 'f', html: 'fMRI: seconds later', color: C.amber, anchor: () => W(P.poleR), dx: -120, dy: 110, show: false };
+        labels.set([labE, labF]);
+        const setT = (s) => {
+          t = s;
+          const e = s > 1.08 ? Math.exp(-(((s - 1.25) / 0.45) ** 2)) : 0;      // visual evoked response (held a little longer so it can be seen)
+          rig.setMapGain(e);
+          rig.highlight(e > 0.3 ? { O1: C.cyan, O2: C.cyan, Oz: C.cyan } : {});
+          bold.level = s - 1 >= 5 ? Math.max(0.55, hrf(s - 1)) : Math.max(0, hrf(s - 1));
+          labE.show = s >= 1.12; labF.show = s >= 4.2;
+          panel.redraw();
+        };
+        ctl([{ label: '▶ Show a picture', onClick: () => { stopAll(); setT(0); run(10000, (p) => setT(p * 10)); } }]);
+        panel.show({ cls: 'side', title: 'EEG and fMRI on one timeline', sub: 'Illustrative traces. Time shown in real seconds.', draw: (g) => drawCompare(g, t), aria: 'EEG changes within a fraction of a second of the picture; the fMRI signal rises seconds later.' });
+        setT(instant || rm() ? 10 : 0);
+        if (rm()) { rig.setMapGain(0.9); rig.highlight({ O1: C.cyan, O2: C.cyan, Oz: C.cyan }); }
+        if (!instant && !rm()) run(10000, (p) => setT(p * 10));
+        cap(CAPTIONS[4][0]);
+      },
+      erp: (step) => {
+        S.root.dataset.layout = 'side';
+        headScene(0.3, [0.9, 0.75, -0.7], 520);
+        rig.highlight({ Pz: C.amber });
+        chips.set([{ text: 'Pz', color: C.amber, anchor: () => rig.worldPos('Pz'), facing: () => rig.facing('Pz', cam) }]);
+        labels.set([{ id: 'pz', html: 'Recording electrode<small>simulated data</small>', color: C.amber, anchor: () => rig.worldPos('Pz'), dx: -150, dy: -110 }]);
+        if (step === 6 && nTrials < 20 && !instant) nTrials = 100;
+        const N_CAPTION = {
+          1: 'One trial: the response is hidden in the random noise.',
+          5: 'Five trials averaged: a shape is starting to appear.',
+          20: 'Twenty trials averaged: the peaks are now clear.',
+          100: '100 trials averaged: the noise has almost cancelled out.',
+        };
+        const setN = (n, animate) => {
+          nTrials = n; pressOnly(S.ctrl, String(n));
+          const from = shown.slice(), to = ERP_AVG[n];
+          stopAll();
+          const apply = (p) => { const e = p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2; shown = from.map((v, i) => v + (to[i] - v) * e); panel.redraw(); };
+          if (animate) run(700, apply); else apply(1);
+          if (step === 5) cap(`Simulation. ${N_CAPTION[n]}`);
+          else if (step === 6 && n < 20) cap('Average at least 20 trials to see the components clearly.');
+          else cap(CAPTIONS[step][0]);
+        };
+        ctl([1, 5, 20, 100].map((n) => ({ label: String(n), key: String(n), pressed: n === nTrials, onClick: () => setN(n, true) })), 'Trials to average:');
+        panel.show({ cls: 'side wide', title: step === 5 ? 'Averaging trials' : step === 6 ? 'ERP components' : 'ERPs: timing to the millisecond', sub: 'Simulation: made-up signal + noise', draw: (g) => drawErp(g, shown, nTrials, step), aria: CAPTIONS[step][1] });
+        setN(nTrials, !instant);
+      },
+      8: () => {
+        lesion.setVisible(true);
+        fly(brainC, [1, 0.12, 0.25], 420);
+        labels.set([{ id: 'b', html: 'Damage found here<small>around Broca’s area, left frontal lobe</small>', color: C.red, anchor: () => W(P.broca), facing: facing(P.broca, [1, 0, 0.3]), dx: -40, dy: 150 }]);
+        panel.show({ cls: 'card right', title: 'Broca’s patient “Tan”', sub: '<strong>1. In life:</strong> he understood speech, but could only say “tan”.<br><strong>2. After death:</strong> Broca examined his brain and found damage in the left frontal lobe.<br><strong>3.</strong> Broca linked the two.' });
+        cap(CAPTIONS[8][0]);
+      },
+      9: () => {
+        slicer.setPalette(TISSUE);
+        let z = hippoMid.z;
+        const setZ = (val) => {
+          z = val; slicer.cut([0, 0, -1], new THREE.Vector3(0, 0, z)); updateHippoCut(z);
+          labels.set([
+            { id: 'h', html: 'Hippocampus<small>a deep structure</small>', color: '#FFC23D', anchor: () => (hippoCut.left ? W(hippoCut.left) : null), dx: 150, dy: 110 },
+            { id: 'h2', html: 'Hippocampus', color: '#FFC23D', anchor: () => (hippoCut.right ? W(hippoCut.right) : null), dx: -150, dy: 110 },
+          ]);
+        };
+        // front view: the subject's left is on the viewer's right
+        chips.set([
+          { text: 'Left', centre: true, anchor: () => W(new THREE.Vector3(brainC.x + 82, brainC.y + 40, z)) },
+          { text: 'Right', centre: true, anchor: () => W(new THREE.Vector3(brainC.x - 82, brainC.y + 40, z)) },
+        ]);
+        setZ(z);
+        fly(new THREE.Vector3(brainC.x, brainC.y - 8, z), [0.42, 0.32, 1], 420);
+        const zMin = Math.round(hippoBox.min.z + 2), zMax = Math.round(hippoBox.max.z + 30);
+        ctl([{ range: { label: 'Move the slice', min: zMin, max: zMax, step: 1, value: Math.round(z), onInput: (v) => { setZ(v); cap(v > hippoBox.max.z ? 'This slice is in front of the hippocampus.' : CAPTIONS[9][0]); } } }]);
+        cap(CAPTIONS[9][0]);
+      },
+      10: () => {
+        S.root.dataset.layout = 'side';
+        headScene(0.22, [0.8, 0.45, -1], 560);
+        showBold('see', 0.9);
+        let sel = 'all';
+        const text = {
+          all: CAPTIONS[10][0],
+          fmri: 'fMRI: good spatial resolution, poor temporal resolution.',
+          eeg: 'EEG: excellent temporal resolution, poor spatial resolution.',
+          erp: 'ERP: excellent temporal resolution, poor spatial resolution, for one type of stimulus.',
+          pm: 'Post-mortem: very fine structural detail, but it shows no activity over time.',
+        };
+        const pick = (m) => { sel = m; pressOnly(S.ctrl, m); panel.redraw(); cap(text[m]); };
+        ctl([...[['fmri', 'fMRI'], ['eeg', 'EEG'], ['erp', 'ERP'], ['pm', 'Post-mortem']].map(([k, l]) => ({ label: l, key: k, pressed: false, onClick: () => pick(k) })),
+          { label: 'Show all', key: 'all', pressed: true, onClick: () => pick('all') }]);
+        panel.show({ cls: 'side wide', title: 'Comparing the methods', draw: (g) => drawMethods(g, sel), aria: CAPTIONS[10][1] });
+        pick('all');
+      },
+    };
+
+    let nTrials = 1;
+    let shown = ERP_AVG[1].slice();
+    let stepNow = -2;
+    return {
+      show(step) {
+        const moved = step !== stepNow;
+        stepNow = step;
+        instant = !moved;
+        reset();
+        const s = Math.max(-1, Math.min(10, step));
+        const fn = s >= 5 && s <= 7 ? () => STEPS.erp(s) : STEPS[s];
+        building = true; pendingFly = null;
+        const aria = fn() || CAPTIONS[s]?.[1] || INTRO[1];
+        building = false;
+        if (pendingFly) flyTo(viewer, ...pendingFly, instant || rm());
+        viewer.renderer.domElement.setAttribute('aria-label', aria);
+        S.root.setAttribute('aria-label', aria);
+        instant = false;
+      },
+      dispose() {
+        stopAll(); labels.dispose(); chips.dispose(); panel.dispose();
+        bold.dispose(); lesion.dispose(); slicer.dispose(); rig.dispose();
+        viewer.dispose(); S.root.remove();
+      },
+    };
+  },
+};
+
+/* ------------------------------------------------------------------ the lesson (text fact-checked: keep) */
 export default {
   id: 'studying-the-brain',
   title: 'Ways of studying the brain',
@@ -542,255 +783,5 @@ export default {
     'EEG: overall electrical activity from the scalp. ERPs: EEG averaged over many trials of one stimulus. Both have excellent temporal but poor spatial resolution.',
     'Post-mortem: the brain is studied after death and linked to behaviour in life. Detailed, but causation and consent are problems.',
   ],
-  visual: {
-    dark: true,
-    async create(container) {
-      const root = document.createElement('div');
-      root.className = 'stb';
-      root.innerHTML = `<style>${CSS}</style><div class="vis-controls" role="group" aria-label="Diagram buttons"></div>${SVG}<p class="vis-caption" aria-live="polite"></p>`;
-      container.append(root);
-      const svg = root.querySelector('svg');
-      const ctrl = root.querySelector('.vis-controls');
-      const cap = root.querySelector('.vis-caption');
-      const $ = (s, r = svg) => r.querySelector(s);
-      const $$ = (s, r = svg) => [...r.querySelectorAll(s)];
-      const rm = () => reducedMotion();
-
-      const timers = new Set();
-      let raf = 0;
-      const later = (fn, ms) => { const t = setTimeout(() => { timers.delete(t); fn(); }, ms); timers.add(t); };
-      const stopAll = () => { timers.forEach(clearTimeout); timers.clear(); cancelAnimationFrame(raf); raf = 0; };
-      // Run fn(progress 0..1) over `dur` ms; with reduced motion jump straight to the end.
-      const tween = (dur, fn, done) => {
-        cancelAnimationFrame(raf);
-        if (rm()) { fn(1); done?.(); return; }
-        const t0 = performance.now();
-        const frame = (now) => {
-          const p = Math.min(1, (now - t0) / dur);
-          fn(p);
-          if (p < 1) raf = requestAnimationFrame(frame); else done?.();
-        };
-        raf = requestAnimationFrame(frame);
-      };
-      const ease = (p) => (p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2);
-      const grow = (p, animate, dur = 1200, delay = 0) => {
-        const len = p.getTotalLength() + 2;
-        p.style.transition = 'none';
-        p.style.strokeDasharray = `${len} ${len}`;
-        if (!animate || rm()) { p.style.strokeDashoffset = '0'; return; }
-        p.style.strokeDashoffset = `${len}`;
-        p.getBoundingClientRect();
-        p.style.transition = `stroke-dashoffset ${dur}ms ease ${delay}ms`;
-        p.style.strokeDashoffset = '0';
-      };
-      const fitPills = (scope) => {
-        $$('.stb-pill', scope).forEach((g) => {
-          const t = $('text', g), r = $('rect', g);
-          const b = t.getBBox();
-          if (!b.width) return;
-          r.setAttribute('x', b.x - 10); r.setAttribute('width', b.width + 20);
-          r.setAttribute('y', b.y - 6); r.setAttribute('height', b.height + 12);
-        });
-      };
-      const show = (el, on) => el.classList.toggle('off', !on);
-
-      const setControls = (defs, label = '') => {
-        const kids = [];
-        if (label) { const s = document.createElement('span'); s.className = 'stb-ctl-label'; s.textContent = label; kids.push(s); }
-        defs.forEach((d) => {
-          const b = document.createElement('button');
-          b.type = 'button'; b.textContent = d.label;
-          if (d.pressed !== undefined) b.setAttribute('aria-pressed', String(d.pressed));
-          if (d.key) b.dataset.key = d.key;
-          b.addEventListener('click', d.onClick);
-          kids.push(b);
-        });
-        ctrl.replaceChildren(...kids);
-      };
-      const pressOnly = (key) => $$('button[data-key]', ctrl).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.key === key)));
-
-      /* ---------- fMRI: blood flow (step 1) */
-      const cells = $$('.stb-cell');
-      const placeCells = (offset) => {
-        cells.forEach((c, i) => {
-          const x = 330 + (((i * 26 + offset) % 312) + 312) % 312;
-          const y = 200 + Math.sin(i * 1.7) * 9;
-          c.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${(i * 37) % 60 - 30})`);
-        });
-      };
-      const flow = () => {
-        placeCells(0);
-        tween(8000, (p) => placeCells(ease(p) * 260));
-      };
-
-      /* ---------- fMRI: timing (step 2) */
-      const blob = $('.stb-blob');
-      const sweep = $('.stb-sweep');
-      const fCursor = $('[data-scene="fmri"] .stb-cursor');
-      const setFmriTime = (t) => { // t in seconds 0..12
-        const x = 320 + t * 24;
-        sweep.setAttribute('width', Math.max(0, x - 310 + 2));
-        fCursor.setAttribute('x1', x); fCursor.setAttribute('x2', x);
-        // The map shows the area once the signal has risen (it stays marked after the peak).
-        blob.style.opacity = String(t >= 5 ? 1 : Math.max(0, Math.min(1, hrf(t))));
-        show($('.stb-late'), t >= 4);
-      };
-      const runFmri = () => { setFmriTime(0); tween(6000, (p) => setFmriTime(p * 12)); };
-
-      /* ---------- EEG */
-      let eegKind = 'alert';
-      const setEeg = (kind, animate) => {
-        eegKind = kind;
-        $('.stb-eeg-title').textContent = EEG_KINDS[kind].title;
-        $('.stb-eeg-desc').textContent = EEG_KINDS[kind].desc;
-        const tr = $('.stb-eeg-trace');
-        tr.setAttribute('d', eegPath(kind, 290, 612, 216));
-        tr.style.stroke = kind === 'seizure' ? C.red : C.cyan;
-        grow(tr, animate, 1600);
-        pressOnly(kind);
-        cap.textContent = `${EEG_KINDS[kind].title}. ${EEG_KINDS[kind].desc}. Illustrative pattern.`;
-      };
-
-      /* ---------- EEG vs fMRI */
-      const sweep2 = $('.stb-sweep2');
-      const cCursor = $('[data-scene="compare"] .stb-cursor');
-      const setCmpTime = (t) => { // 0..10 s
-        const x = 130 + t * 48.5;
-        sweep2.setAttribute('width', Math.max(0, x - 125 + 2));
-        cCursor.setAttribute('x1', x); cCursor.setAttribute('x2', x);
-        show($('.stb-c1'), t >= 1.6);
-        show($('.stb-c2'), t >= 4.2);
-      };
-      const runCmp = () => { setCmpTime(0); tween(7000, (p) => setCmpTime(p * 10)); };
-
-      /* ---------- ERP averaging */
-      let nTrials = 1;
-      let shown = ERP_AVG[1].slice();
-      const avgPath = $('.stb-avg');
-      const nLabel = $('.stb-n-label');
-      const N_CAPTION = {
-        1: 'One trial: the response is hidden in the random noise.',
-        5: 'Five trials averaged: a shape is starting to appear.',
-        20: 'Twenty trials averaged: the peaks are now clear.',
-        100: '100 trials averaged: the noise has almost cancelled out.',
-      };
-      let erpStep = 5;
-      const drawAvg = (arr) => avgPath.setAttribute('d', erpD(arr, 262, 8.5));
-      const updateErpLabels = () => {
-        const clear = nTrials >= 20;
-        $$('.stb-comp').forEach((el) => show(el, erpStep === 6 && clear));
-        show($('.stb-early'), erpStep === 6 && clear);
-        $$('.stb-ev').forEach((el) => show(el, erpStep === 7));
-        $$('.stb-pa').forEach((el) => el.classList.toggle('dim', erpStep === 6));
-      };
-      const setN = (n, animate) => {
-        nTrials = n;
-        nLabel.textContent = `Average of ${n} ${n === 1 ? 'trial' : 'trials'}`;
-        pressOnly(String(n));
-        const from = shown.slice(), to = ERP_AVG[n];
-        const apply = (p) => { const e = ease(p); shown = from.map((v, i) => v + (to[i] - v) * e); drawAvg(shown); };
-        if (animate) tween(700, apply); else apply(1);
-        updateErpLabels();
-        if (erpStep === 5) cap.textContent = `Simulation. ${N_CAPTION[n]}`;
-        else if (erpStep === 6 && n < 20) cap.textContent = 'Average at least 20 trials to see the components clearly.';
-        else cap.textContent = CAPTIONS[erpStep][0];
-      };
-
-      /* ---------- chart */
-      const pickMethod = (m) => {
-        $$('.stb-pt').forEach((g) => g.classList.toggle('dim', m !== 'all' && g.dataset.m !== m));
-        $$('.stb-det').forEach((g) => show(g, g.dataset.m === m));
-        pressOnly(m);
-        const text = {
-          all: CAPTIONS[10][0],
-          fmri: 'fMRI: good spatial resolution, poor temporal resolution.',
-          eeg: 'EEG: excellent temporal resolution, poor spatial resolution.',
-          erp: 'ERP: excellent temporal resolution, poor spatial resolution, for one type of stimulus.',
-          pm: 'Post-mortem: very fine structural detail, but it shows no activity over time.',
-        };
-        cap.textContent = text[m];
-      };
-
-      /* ---------- scene switching */
-      const SCENE_OF = (s) => (s < 0 ? 'methods' : s === 0 ? 'res' : s <= 2 ? 'fmri' : s === 3 ? 'eeg' : s === 4 ? 'compare' : s <= 7 ? 'erp' : s <= 9 ? 'pm' : 'chart');
-      const scenes = Object.fromEntries($$('[data-scene]').map((g) => [g.dataset.scene, g]));
-      let current = null;
-      const setScene = (name) => {
-        if (current !== name) {
-          Object.entries(scenes).forEach(([k, g]) => { g.style.display = k === name ? '' : 'none'; });
-          current = name;
-        }
-        return scenes[name];
-      };
-
-      let stepNow = -2;
-      const play = (step, animate) => {
-        stopAll();
-        const name = SCENE_OF(step);
-        const scene = setScene(name);
-        const [caption, aria] = CAPTIONS[step] || (step < 0
-          ? ['Four ways of studying the brain.', 'Four cards: fMRI measures blood oxygen in a scanner; EEG measures electrical activity from the scalp; ERP is the brain response to one event; post-mortem is the brain studied after death.']
-          : ['Spatial = where. Temporal = when.', CAPTIONS[10][1]]);
-        cap.textContent = caption;
-        svg.setAttribute('aria-label', aria);
-        setControls([]);
-        fitPills(scene);
-
-        if (name === 'fmri') {
-          const one = step === 1;
-          show($('.stb-f1'), one); show($('.stb-f2'), !one);
-          $('.stb-f1').style.display = one ? '' : 'none';
-          $('.stb-f2').style.display = one ? 'none' : '';
-          fitPills(scene);
-          if (one) {
-            blob.style.opacity = '1';
-            if (animate && !rm()) flow(); else placeCells(120);
-            setControls([{ label: '↻ Play again', onClick: () => { stopAll(); flow(); } }]);
-          } else {
-            setFmriTime(rm() || !animate ? 12 : 0);
-            setControls([{ label: '▶ Start the task', onClick: () => { stopAll(); runFmri(); } }]);
-          }
-        } else if (name === 'eeg') {
-          setControls(Object.entries(EEG_KINDS).map(([k, v]) => ({ label: v.label, key: k, pressed: k === eegKind, onClick: () => setEeg(k, true) })));
-          setEeg(eegKind, animate);
-        } else if (name === 'compare') {
-          setCmpTime(rm() || !animate ? 10 : 0);
-          setControls([{ label: '▶ Show a picture', onClick: () => { stopAll(); runCmp(); } }]);
-        } else if (name === 'erp') {
-          erpStep = step;
-          if (step === 6 && nTrials < 20 && animate) nTrials = 100;
-          setControls([1, 5, 20, 100].map((n) => ({ label: String(n), key: String(n), pressed: n === nTrials, onClick: () => setN(n, true) })), 'Trials to average:');
-          setN(nTrials, animate);
-          fitPills(scene);
-        } else if (name === 'pm') {
-          const eight = step === 8;
-          $('.stb-pm8').style.display = eight ? '' : 'none';
-          $('.stb-pm9').style.display = eight ? 'none' : '';
-          show($('.stb-pm8l'), eight); show($('.stb-pm9l'), !eight);
-          $('.stb-broca').style.opacity = eight ? '1' : '0.35';
-          $('.stb-hippo').style.display = eight ? 'none' : '';
-          fitPills(scene);
-        } else if (name === 'chart') {
-          if (step === 10) {
-            setControls([
-              ...[['fmri', 'fMRI'], ['eeg', 'EEG'], ['erp', 'ERP'], ['pm', 'Post-mortem']].map(([k, l]) => ({ label: l, key: k, pressed: false, onClick: () => pickMethod(k) })),
-              { label: 'Show all', key: 'all', pressed: true, onClick: () => pickMethod('all') },
-            ]);
-          }
-          pickMethod('all');
-          if (step !== 10) cap.textContent = caption;
-          fitPills(scene);
-        }
-      };
-
-      return {
-        show(step) {
-          const moved = step !== stepNow;
-          stepNow = step;
-          play(step, moved);
-        },
-        dispose() { stopAll(); root.remove(); },
-      };
-    },
-  },
+  visual: VISUAL,
 };

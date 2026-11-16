@@ -1,0 +1,117 @@
+{
+  "about": "Real neuron shapes and protein shapes used in the 3D lesson visuals (Neurons, Synaptic transmission). Neuron files are SWC reconstructions downloaded from NeuroMorpho.Org on 2026-11-15 (CNG versions) and simplified for the web (fewer points along unbranched stretches; branch points, end points and the cell body kept). Protein surfaces are smoothed, low-poly surfaces computed by us from the atom coordinates of public Protein Data Bank entries.",
+  "neuromorpho_terms": {
+    "licence": "NeuroMorpho.Org content is licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).",
+    "required_citations": [
+      "The original paper describing each reconstruction (listed below).",
+      "NeuroMorpho.Org (RRID:SCR_002145).",
+      "Tecuatl C, Ljungquist B, Ascoli GA (2024) Accelerating the continuous community sharing of digital neuromorphology data. FASEB BioAdvances 6(7):207-221. doi:10.1096/fba.2024-00048"
+    ],
+    "url": "https://neuromorpho.org/useterm.jsp"
+  },
+  "neurons": [
+    {
+      "file": "pyramidal-human-685815936.swc",
+      "used_for": "The generic neuron (Neurons lesson steps 1-5 and recap); the postsynaptic neuron in the summation demo (Synaptic transmission step 6).",
+      "neuromorpho_name": "685815936_transformed",
+      "neuromorpho_id": "NMO_162204",
+      "neuromorpho_url": "https://neuromorpho.org/neuron_info.jsp?neuron_name=685815936_transformed",
+      "archive": "Allen Cell Types (Allen Institute for Brain Science)",
+      "species": "human",
+      "brain_region": "neocortex, temporal lobe, middle temporal gyrus (left), layer 2/3",
+      "cell_type": "pyramidal neuron (excitatory, intratelencephalic)",
+      "notes": "Tissue removed during neurosurgery (epilepsy), studied in a brain slice. Dendrites and axon reconstructed (NeuroMorpho integrity: 'Dendrites & Axon Complete'); the axon is cut where it leaves the slice. No myelin in the reconstruction: myelin sheaths and nodes of Ranvier are drawn along the main axon and labelled as added. The nucleus is drawn. Thin branches are drawn at least about 1 pixel wide so they stay visible. Original data © Allen Institute for Brain Science (Allen Cell Types Database); the Allen Institute's own terms allow non-commercial use only.",
+      "original_paper": "Berg J, Sorensen SA, Ting JT, Miller JA, et al. (2021) Human neocortical expansion involves glutamatergic neuron diversification. Nature 598:151-158. doi:10.1038/s41586-021-03813-8",
+      "points": "3256 of 14470 kept"
+    },
+    {
+      "file": "motor-rat-alvarez-control-1.swc",
+      "used_for": "Motor neuron (Neurons lesson step 9 and the reflex arc).",
+      "neuromorpho_name": "Alvarez-Control-Cell-1",
+      "neuromorpho_id": "NMO_32021",
+      "neuromorpho_url": "https://neuromorpho.org/neuron_info.jsp?neuron_name=Alvarez-Control-Cell-1",
+      "archive": "Alvarez",
+      "species": "rat (Wistar)",
+      "brain_region": "spinal cord, lumbar L4-L5, ventral horn",
+      "cell_type": "alpha motor neuron projecting to the gastrocnemius muscle",
+      "notes": "Filled in vivo. Dendrites complete; the axon is only reconstructed inside the spinal cord. The axon's continuation through the ventral root to a muscle, its myelin and the muscle are drawn and labelled as drawn.",
+      "original_paper": "Rotterman TM, Nardelli P, Cope TC, Alvarez FJ (2014) Normal distribution of VGLUT1 synapses on spinal motoneuron dendrites and their reorganization after nerve injury. Journal of Neuroscience 34(10):3475-3492. doi:10.1523/JNEUROSCI.4768-13.2014",
+      "points": "5395 of 84254 kept"
+    },
+    {
+      "file": "relay-mouse-todd-26-2-15-C.swc",
+      "used_for": "Relay neuron (Neurons lesson step 8 and the reflex arc).",
+      "neuromorpho_name": "26-2-15-C",
+      "neuromorpho_id": "NMO_109025",
+      "neuromorpho_url": "https://neuromorpho.org/neuron_info.jsp?neuron_name=26-2-15-C",
+      "archive": "Todd",
+      "species": "mouse",
+      "brain_region": "spinal cord, lumbar, dorsal horn",
+      "cell_type": "excitatory interneuron (gastrin-releasing peptide-expressing)",
+      "notes": "A CNS interneuron used as the example 'relay neuron'. Reconstructed from a parasagittal slice (integrity 'Dendrites & Axon Moderate'). It is turned on its side in the 'three types' view and turned and resized to fit in the reflex arc.",
+      "original_paper": "Dickie AC, Bell AM, Iwagaki N, et al., Todd AJ (2019) Morphological and functional properties distinguish the substance P and gastrin-releasing peptide subsets of excitatory interneuron in the spinal cord dorsal horn. Pain 160(2):442-462. doi:10.1097/j.pain.0000000000001406",
+      "points": "2020 of 16773 kept"
+    },
+    {
+      "file": "sensory-skin-ending-mouse-A21-44.swc",
+      "used_for": "The receptor ending of the sensory neuron (Neurons lesson step 7 and the reflex arc).",
+      "neuromorpho_name": "skin-A21-44",
+      "neuromorpho_id": "NMO_10096",
+      "neuromorpho_url": "https://neuromorpho.org/neuron_info.jsp?neuron_name=skin-A21-44",
+      "archive": "Nathans",
+      "species": "mouse",
+      "brain_region": "peripheral nervous system, dorsal root ganglion neuron (its ending in the skin)",
+      "cell_type": "somatic sensory afferent (cutaneous arbor)",
+      "notes": "Only the branching ending in the skin was reconstructed (no cell body, no diameters). NeuroMorpho.Org has no complete reconstruction of a mammalian dorsal root ganglion (pseudo-unipolar) neuron with its cell body, peripheral and central branches (searched 2026-11-15: DRG entries are skin endings, cultured cells, or soma-only). So the long fibre, the cell body in the ganglion, the T-shaped junction and the short central branch are drawn, and labelled as drawn. NeuroMorpho.Org records this tracing as an axon arbor: the branching ending of the sensory fibre. AQA calls the long fibre from the receptor a dendrite, so the lesson labels it that way, with a note that scientists often call it an axon.",
+      "original_paper": "Wu H, Williams J, Nathans J (2012) Morphologic diversity of cutaneous sensory afferents revealed by genetically directed sparse labeling. eLife 1:e00181. doi:10.7554/eLife.00181",
+      "points": "620 of 1072 kept"
+    }
+  ],
+  "proteins": {
+    "licence": "Protein Data Bank (wwPDB) data are free of all copyright restrictions (CC0 1.0 public domain dedication). Please cite the structure's primary publication.",
+    "method": "Heavy atoms of the protein chains only (antibodies, nanobodies, sugars, drugs and water removed). Gaussian density on a 2 Å grid, marching-cubes surface, coarse sampling for a low-poly mesh. Membrane proteins were oriented with their membrane slab horizontal (hydrophobic-band search) and the outside of the cell up.",
+    "entries": [
+      {
+        "file": "../molecules/ampa-receptor-3KG2.json",
+        "pdb": "3KG2",
+        "url": "https://www.rcsb.org/structure/3KG2",
+        "used_for": "Excitatory receptor (glutamate receptor, AMPA type)",
+        "protein": "Rat GluA2 AMPA-type glutamate receptor (tetramer)",
+        "citation": "Sobolevsky AI, Rosconi MP, Gouaux E (2009) X-ray structure, symmetry and mechanism of an AMPA-subtype glutamate receptor. Nature 462:745-756. doi:10.1038/nature08624"
+      },
+      {
+        "file": "../molecules/gabaa-receptor-6HUP.json",
+        "pdb": "6HUP",
+        "url": "https://www.rcsb.org/structure/6HUP",
+        "used_for": "Inhibitory receptor (GABA-A receptor)",
+        "protein": "Human GABA-A receptor alpha1-beta3-gamma2 (pentamer)",
+        "citation": "Masiulis S, Desai R, Uchanski T, et al., Aricescu AR (2019) GABA-A receptor signalling mechanisms revealed by structural pharmacology. Nature 565:454-459. doi:10.1038/s41586-018-0832-5"
+      },
+      {
+        "file": "../molecules/serotonin-transporter-5I6X.json",
+        "pdb": "5I6X",
+        "url": "https://www.rcsb.org/structure/5I6X",
+        "used_for": "Reuptake transporter",
+        "protein": "Human serotonin transporter (SERT)",
+        "citation": "Coleman JA, Green EM, Gouaux E (2016) X-ray structures and mechanism of the human serotonin transporter. Nature 532:334-339. doi:10.1038/nature17629"
+      },
+      {
+        "file": "../molecules/acetylcholinesterase-4EY4.json",
+        "pdb": "4EY4",
+        "url": "https://www.rcsb.org/structure/4EY4",
+        "used_for": "Enzyme that breaks neurotransmitter down",
+        "protein": "Human acetylcholinesterase (one chain)",
+        "citation": "Cheung J, Rudolph MJ, Burshteyn F, et al., Height JJ (2012) Structures of human acetylcholinesterase in complex with pharmacologically important ligands. Journal of Medicinal Chemistry 55:10282-10286. doi:10.1021/jm300871x"
+      }
+    ],
+    "note": "These four proteins come from different kinds of synapse. They are shown together as examples of a receptor, a transporter and an enzyme; no single real synapse has all four."
+  },
+  "drawn_not_data": [
+    "Myelin sheaths and nodes of Ranvier (no reconstruction includes myelin).",
+    "Terminal buttons: a small swelling drawn at the end of every traced axon branch (the tracings do not record them; some branch ends are where the axon was cut by the slice).",
+    "The nucleus inside the cell body.",
+    "The 'next neuron' dendrite at the terminal button, and the width of the gap.",
+    "The sensory neuron's fibre, cell body and T-junction; the motor axon outside the spinal cord; the muscle, skin, nerves and spinal cord.",
+    "The synapse membranes, vesicles and neurotransmitter molecules (molecules drawn about 10 times bigger than real and far fewer)."
+  ]
+}
